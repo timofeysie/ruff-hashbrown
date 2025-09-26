@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
-import { ArrowUpRight } from '../../icons/ArrowUpRight';
+import { Component, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { ArrowUpRight } from '../icons/ArrowUpRight';
 
 @Component({
   selector: 'www-the-gravy',
@@ -10,11 +11,11 @@ import { ArrowUpRight } from '../../icons/ArrowUpRight';
         <img src="/image/thegravy/brand-and-word-mark.svg" alt="The Gravy" />
         <div>
           <p>
-            Your morning helping of all things generative user interfaces,
-            served fresh on Thursdays, free
+            Staying on top of JS + AI has never been more entertaining.
+            <br />Served fresh on Thursdays. Free.
           </p>
           <p class="subtitle">
-            We will never spam you. You can unsubscribe at any time.
+            We will never spam you. You can unsubscribe at any time.<br />
             <a href="https://thegravy.dev" target="_blank"
               >View all issues <www-arrow-up-right height="16px" width="16px"
             /></a>
@@ -23,7 +24,7 @@ import { ArrowUpRight } from '../../icons/ArrowUpRight';
       </div>
       <script async src="https://subscribe-forms.beehiiv.com/embed.js"></script>
       <iframe
-        src="https://subscribe-forms.beehiiv.com/56612be1-e6e1-4363-ba58-bae94bb9bd47"
+        [src]="sanitizedUrl()"
         class="beehiiv-embed"
         data-test-id="beehiiv-embed"
         frameborder="0"
@@ -43,15 +44,15 @@ import { ArrowUpRight } from '../../icons/ArrowUpRight';
       flex-direction: column;
       align-items: center;
       gap: 64px;
-      padding: 64px 32px;
+      padding: 16px;
       width: 100%;
-      max-width: 720px;
+      max-width: 800px;
 
       > .title {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 24px;
+        gap: 48px;
 
         > img {
           width: 160px;
@@ -63,7 +64,7 @@ import { ArrowUpRight } from '../../icons/ArrowUpRight';
         > div {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 16px;
 
           > p {
             color: var(--grey-dark, #414042);
@@ -100,6 +101,22 @@ import { ArrowUpRight } from '../../icons/ArrowUpRight';
         background: transparent;
       }
     }
+
+    @media screen and (min-width: 1024px) {
+      .bleed {
+        padding: 64px;
+      }
+    }
   `,
 })
-export class TheGravy {}
+export class TheGravy {
+  private sanitizer = inject(DomSanitizer);
+
+  id = input<string>('56612be1-e6e1-4363-ba58-bae94bb9bd47');
+
+  sanitizedUrl = computed(() =>
+    this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://subscribe-forms.beehiiv.com/${this.id()}`,
+    ),
+  );
+}
