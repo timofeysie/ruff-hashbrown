@@ -1,26 +1,38 @@
 {
-  "name": "smart-home-netlify",
+  "name": "finance-cloudflare",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "samples/smart-home/netlify/src",
+  "sourceRoot": "samples/finance/angular/functions",
   "projectType": "application",
   "targets": {
+    "generate-data": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx samples/finance/cloudflare/tools/generate-ingredients.ts",
+        "parallel": true
+      }
+    },
     "build": {
       "executor": "@nx/esbuild:esbuild",
+      "dependsOn": ["generate-data"],
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "platform": "browser",
-        "outputPath": "dist/samples/smart-home/netlify",
+        "outputPath": "dist/samples/finance/cloudflare",
         "format": ["esm"],
         "bundle": true,
         "thirdParty": true,
-        "main": "samples/smart-home/netlify/src/chat.ts",
-        "tsConfig": "samples/smart-home/netlify/tsconfig.app.json",
+        "main": "samples/finance/angular/functions/api/chat.ts",
+        "additionalEntryPoints": [
+          "samples/finance/angular/functions/api/ingredients.ts"
+        ],
+        "tsConfig": "samples/finance/cloudflare/tsconfig.app.json",
         "generatePackageJson": false,
         "esbuildOptions": {
           "sourcemap": true,
           "mainFields": ["browser", "module", "main"],
           "conditions": ["browser"],
+          "outbase": "samples/finance/angular/functions",
           "outExtension": {
             ".js": ".js"
           }
@@ -44,15 +56,15 @@
       "defaultConfiguration": "development",
       "dependsOn": ["build"],
       "options": {
-        "buildTarget": "smart-home-netlify:build",
+        "buildTarget": "finance-cloudflare:build",
         "runBuildTargetDependencies": false
       },
       "configurations": {
         "development": {
-          "buildTarget": "smart-home-netlify:build:development"
+          "buildTarget": "finance-cloudflare:build:development"
         },
         "production": {
-          "buildTarget": "smart-home-netlify:build:production"
+          "buildTarget": "finance-cloudflare:build:production"
         }
       }
     }

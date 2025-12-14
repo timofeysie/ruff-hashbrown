@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const projectRoot = resolve(__dirname, '..');
-const outDir = resolve(projectRoot, 'src');
+const outDir = resolve(projectRoot, '../angular/functions');
 const outFile = resolve(outDir, 'ingredients.json');
 
 mkdirSync(outDir, { recursive: true });

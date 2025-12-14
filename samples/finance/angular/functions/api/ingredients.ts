@@ -1,4 +1,4 @@
-import INGREDIENTS_JSON from './ingredients.json';
+import INGREDIENTS_JSON from '../ingredients.json';
 
 type Ingredient = {
   id: string;
@@ -8,18 +8,13 @@ type Ingredient = {
 
 const INGREDIENTS = INGREDIENTS_JSON as Ingredient[];
 
-function json(data: unknown, init?: ResponseInit): Response {
-  return new Response(JSON.stringify(data), {
+const json = (data: unknown, init?: ResponseInit) =>
+  new Response(JSON.stringify(data), {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
-}
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'GET') {
-    return json({ error: 'Method Not Allowed' }, { status: 405 });
-  }
-
+export const onRequestGet = async ({ request }: { request: Request }) => {
   const url = new URL(request.url);
 
   const startDateString = url.searchParams.get('startDate');
@@ -54,4 +49,4 @@ export default async function handler(request: Request): Promise<Response> {
   }));
 
   return json(ingredients);
-}
+};

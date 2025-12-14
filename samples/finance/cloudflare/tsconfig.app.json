@@ -6,5 +6,5 @@
     "types": ["node"],
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["../angular/functions/**/*.ts", "../angular/functions/**/*.json"]
 }
