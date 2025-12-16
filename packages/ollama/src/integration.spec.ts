@@ -3,27 +3,39 @@ import {} from 'dotenv';
 import * as express from 'express';
 import * as cors from 'cors';
 import { Chat, fryHashbrown, Hashbrown, s } from '@hashbrownai/core';
-import { HashbrownWriter } from './index';
+import { HashbrownOllama } from './index';
 
-const WRITER_API_KEY = process.env['WRITER_API_KEY'] ?? '';
+const OLLAMA_MODEL = 'gpt-oss:120b';
+const OLLAMA_TURBO_API_KEY = process.env['OLLAMA_API_KEY'];
+const OLLAMA_HOST = process.env['OLLAMA_HOST'];
 
 jest.setTimeout(60_000);
 
-test('Writer Text Streaming', async () => {
+test('Ollama Text Streaming', async () => {
   const server = await createServer((request) =>
-    HashbrownWriter.stream.text({
-      apiKey: WRITER_API_KEY,
+    HashbrownOllama.stream.text({
+      turbo: OLLAMA_TURBO_API_KEY
+        ? { apiKey: OLLAMA_TURBO_API_KEY }
+        : undefined,
       request,
+      transformRequestOptions: (opts) => ({
+        ...opts,
+        // Allow overriding host for local daemon when provided
+        ...(OLLAMA_HOST ? { host: OLLAMA_HOST } : {}),
+      }),
     }),
   );
   try {
     const hashbrown = fryHashbrown({
       debounce: 0,
       apiUrl: server.url,
-      model: 'palmyra-x5',
+      model: OLLAMA_MODEL,
       system: `
-     I am writing an integration test against Writer. Respond
+     I am writing an integration test against Ollama. Respond
      exactly with the text "Hello, world!"
+
+     Example output:
+     Hello, world!
 
      DO NOT respond with any other text.
     `,
@@ -34,7 +46,6 @@ test('Writer Text Streaming', async () => {
         },
       ],
     });
-
     await waitUntilHashbrownIsSettled(hashbrown);
 
     const assistantMessage = hashbrown
@@ -45,31 +56,54 @@ test('Writer Text Streaming', async () => {
   } finally {
     server.close();
   }
-});
+}, 20_000);
 
-test('Writer Tool Calling', async () => {
+test('Ollama Tool Calling', async () => {
   const expectedResponse =
     "I don't sleep, I hover outside myself, watching my body survive";
   let toolCallArgs: any;
+
   const server = await createServer((request) =>
-    HashbrownWriter.stream.text({
-      apiKey: WRITER_API_KEY,
+    HashbrownOllama.stream.text({
+      turbo: OLLAMA_TURBO_API_KEY
+        ? { apiKey: OLLAMA_TURBO_API_KEY }
+        : undefined,
       request,
+      transformRequestOptions: (opts) => ({
+        ...opts,
+        ...(OLLAMA_HOST ? { host: OLLAMA_HOST } : {}),
+      }),
     }),
   );
+
   try {
     const hashbrown = fryHashbrown({
       debounce: 0,
       apiUrl: server.url,
-      model: 'palmyra-x5',
+      model: OLLAMA_MODEL,
       system: `
-     I am writing an integration test against Writer. Call
+     I am writing an integration test against Ollama. Call
      the "test" tool with the argument "Hello, world!"
 
-      DO NOT respond with any other text.
+     Example tool call args:
+     { "text": "Hello, world!" }
 
-      The tool will respond with JSON containing a "text" field. You must
-      respond with the exact text from the tool call.
+     DO NOT respond with any other text.
+
+     The tool will respond with text. You must respond with the
+     exact text from the tool call.
+
+     Example:
+
+     <user>Please call the test tool and respond with the text.</user>
+     <assistant>
+       <tool-call name="test" id="123">
+         { "text": "Hello, world!" }
+       </tool-call>
+       <assistant>
+         Hello, world!
+       </assistant>
+     </assistant>
     `,
       messages: [
         {
@@ -89,9 +123,7 @@ test('Writer Tool Calling', async () => {
           }): Promise<{ text: string }> => {
             toolCallArgs = args;
 
-            return {
-              text: expectedResponse,
-            };
+            return { text: expectedResponse };
           },
         },
       ],
@@ -111,22 +143,31 @@ test('Writer Tool Calling', async () => {
   }
 });
 
-test('Writer with structured output', async () => {
+test('Ollama with structured output', async () => {
   const server = await createServer((request) =>
-    HashbrownWriter.stream.text({
-      apiKey: WRITER_API_KEY,
+    HashbrownOllama.stream.text({
+      turbo: OLLAMA_TURBO_API_KEY
+        ? { apiKey: OLLAMA_TURBO_API_KEY }
+        : undefined,
       request,
+      transformRequestOptions: (opts) => ({
+        ...opts,
+        ...(OLLAMA_HOST ? { host: OLLAMA_HOST } : {}),
+      }),
     }),
   );
+
   try {
     const hashbrown = fryHashbrown({
       debounce: 0,
       apiUrl: server.url,
-      model: 'palmyra-x5',
-      emulateStructuredOutput: true,
+      model: OLLAMA_MODEL,
       system: `
-     I am writing an integration test against Writer. Respond
+     I am writing an integration test against Ollama. Respond
      exactly with the text "Hello, world!" in JSON format.
+
+     Example output JSON:
+     { "text": "Hello, world!" }
     `,
       messages: [
         {
@@ -152,14 +193,19 @@ test('Writer with structured output', async () => {
   }
 });
 
-test('Writer with tool calling and structured output', async () => {
-  const expectedResponse =
-    "Every time things are going good, having a laugh, gotta remember God's a hater.";
+test('Ollama with tool calling and structured output', async () => {
+  const expectedResponse = 'Hello, world!';
   let toolCallArgs: any;
   const server = await createServer((request) =>
-    HashbrownWriter.stream.text({
-      apiKey: WRITER_API_KEY,
+    HashbrownOllama.stream.text({
+      turbo: OLLAMA_TURBO_API_KEY
+        ? { apiKey: OLLAMA_TURBO_API_KEY }
+        : undefined,
       request,
+      transformRequestOptions: (opts) => ({
+        ...opts,
+        ...(OLLAMA_HOST ? { host: OLLAMA_HOST } : {}),
+      }),
     }),
   );
 
@@ -167,37 +213,17 @@ test('Writer with tool calling and structured output', async () => {
     const hashbrown = fryHashbrown({
       debounce: 0,
       apiUrl: server.url,
-      model: 'palmyra-x5',
-      emulateStructuredOutput: true,
+      model: OLLAMA_MODEL,
       system: `
-      I am writing an integration test against Writer. Call
-      the "test" tool with the following arguments:
-      {
-        "text": "Hello, world!"
-      }
+        You must call the "test" tool with the argument "Hello, world!".
+        After the tool returns, respond only with its text in JSON { "text": "<value>" }.
 
-      The tool will respond with JSON containing a "text" field. You must
-      respond with the exact text from the tool call.
+        Example tool call args:
+        { "text": "Hello, world!" }
 
-      Example:
-      <user>Please call the test tool and respond with the text.</user>
-      <assistant>
-        <tool-call name="test" id="123">
-          {
-            "text": "Hello, world!"
-          }
-        </tool-call>
-        <tool-call-result name="test" id="123">
-          {
-            "text": "Some other text!"
-          }
-        </tool-call-result>
-        <assistant>
-          { "text": "Some other text!" }
-        </assistant>
-      </assistant>
-
-    `,
+        Example final reply JSON:
+        { "text": "Hello, world!" }
+      `,
       messages: [
         {
           role: 'user',
@@ -239,28 +265,31 @@ test('Writer with tool calling and structured output', async () => {
   } finally {
     server.close();
   }
-});
+}, 20_000);
 
-test('Writer supports thread IDs across turns', async () => {
+test('Ollama supports thread IDs across turns', async () => {
   const requests: Chat.Api.CompletionCreateParams[] = [];
   const threadMessages = new Map<string, Chat.Api.Message[]>();
   const server = await createServer((incomingRequest) => {
-    requests.push(incomingRequest);
+    requests.push(cloneCompletionRequest(incomingRequest));
 
-    const iterator = HashbrownWriter.stream.text({
-      apiKey: WRITER_API_KEY,
+    return HashbrownOllama.stream.text({
+      turbo: OLLAMA_TURBO_API_KEY
+        ? { apiKey: OLLAMA_TURBO_API_KEY }
+        : undefined,
       request: incomingRequest,
-      loadThread: async (threadId: string) => {
-        return threadMessages.get(threadId) ?? [];
-      },
+      transformRequestOptions: (opts) => ({
+        ...opts,
+        ...(OLLAMA_HOST ? { host: OLLAMA_HOST } : {}),
+      }),
+      loadThread: async (threadId: string) =>
+        threadMessages.get(threadId) ?? [],
       saveThread: async (thread: Chat.Api.Message[], threadId?: string) => {
-        const id = threadId ?? incomingRequest.threadId ?? 'writer-thread';
-        threadMessages.set(id, thread);
+        const id = threadId ?? incomingRequest.threadId ?? 'ollama-thread';
+        threadMessages.set(id, thread.map(cloneMessage));
         return id;
       },
     });
-
-    return iterator;
   });
 
   let teardown: (() => void) | undefined;
@@ -268,7 +297,7 @@ test('Writer supports thread IDs across turns', async () => {
     const hashbrown = fryHashbrown({
       debounce: 0,
       apiUrl: server.url,
-      model: 'palmyra-x5',
+      model: OLLAMA_MODEL,
       system: `
      You are participating in a deterministic integration test.
 
@@ -276,6 +305,11 @@ test('Writer supports thread IDs across turns', async () => {
      1. When the user sends a message that starts with "Store this value:", respond with "Stored".
      2. When the user later sends a message that is exactly "Recall value", respond with the value that appeared after "Store this value:" in the most recent earlier user message. Respond with the value alone.
      3. For any other message, respond with "Unexpected input".
+
+     Examples:
+     - User: "Store this value: 42" -> Assistant: "Stored"
+     - User: "Recall value" -> Assistant: "42"
+     - User: "Hi" -> Assistant: "Unexpected input"
     `,
       messages: [
         {
@@ -283,7 +317,7 @@ test('Writer supports thread IDs across turns', async () => {
           content: 'Store this value: 12345',
         },
       ],
-      threadId: 'writer-thread',
+      threadId: 'ollama-thread',
     });
 
     teardown = hashbrown.sizzle();
@@ -294,6 +328,13 @@ test('Writer supports thread IDs across turns', async () => {
       .messages()
       .find((message) => message.role === 'assistant');
 
+    expect(requests).toHaveLength(1);
+    expect(requests[0].messages).toEqual([
+      {
+        role: 'user',
+        content: 'Store this value: 12345',
+      },
+    ]);
     expect(firstAssistant?.content).toBe('Stored');
 
     hashbrown.sendMessage({
@@ -330,7 +371,7 @@ test('Writer supports thread IDs across turns', async () => {
     teardown?.();
     server.close();
   }
-});
+}, 20_000);
 
 async function createServer(
   iteratorFactory: (
@@ -396,9 +437,39 @@ async function waitForNextIdle(hashbrown: Hashbrown<any, any>) {
     });
   });
 
-  const errorMessage = hashbrown
-    .messages()
-    .find((message) => message.role === 'error');
+  const errorMessage = hashbrown.error();
 
   if (errorMessage) console.error(errorMessage);
+}
+
+function cloneCompletionRequest(
+  request: Chat.Api.CompletionCreateParams,
+): Chat.Api.CompletionCreateParams {
+  return {
+    ...request,
+    messages: request.messages.map(cloneMessage),
+  };
+}
+
+function cloneMessage(message: Chat.Api.Message): Chat.Api.Message {
+  switch (message.role) {
+    case 'assistant':
+      return {
+        role: 'assistant',
+        content: message.content,
+        toolCalls: message.toolCalls?.map((toolCall) => ({
+          ...toolCall,
+          function: { ...toolCall.function },
+        })),
+      };
+    case 'tool':
+      return {
+        role: 'tool',
+        content: message.content,
+        toolCallId: message.toolCallId,
+        toolName: message.toolName,
+      };
+    default:
+      return { ...message };
+  }
 }
