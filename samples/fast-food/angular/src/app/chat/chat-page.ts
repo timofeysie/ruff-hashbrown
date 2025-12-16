@@ -144,11 +144,11 @@ export class ChatPage implements LinkClickHandler {
 
   chat = uiCompletionResource({
     model: 'gpt-5-chat-latest',
-    debugName: 'finance-chat',
+    debugName: 'fast-food-chat',
     system: prompt`
       You are a culinary insights analyst helping users explore an expanded
       fast-food nutrition dataset stored in
-      samples/finance/angular/public/fastfood_v2.csv. Each row contains the
+      samples/fast-food/angular/public/fastfood_v2.csv. Each row contains the
       chain name, the full menu_item label, a short_name alias, human-friendly
       description, serving_size text, pipe-delimited categories, macronutrients
       (calories, total_fat_g, saturated_fat_g, trans_fat_g, cholesterol_mg,
@@ -445,7 +445,7 @@ export class ChatPage implements LinkClickHandler {
       - link: the URL that was clicked (string)
       - articleContent: the original article body that contained the link
 
-      Produce a concise, first-person imperative brief that the main finance
+      Produce a concise, first-person imperative brief that the main fast-food
       chat analyst can use to generate the new article. Each brief must:
       1. Reference the clicked link text/slug so the new page has a title hook.
       2. Mention which chains, menu items, or nutrient angles to explore based
