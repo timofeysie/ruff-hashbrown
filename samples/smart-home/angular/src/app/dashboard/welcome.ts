@@ -134,9 +134,9 @@ export function closeWelcomeOverlay() {
     >
       <header>
         <div class="heading">
-          <h2>Smart Home App</h2>
+          <h2>Ruff Corp App</h2>
           <p>
-            A smart home dashboard with scenes, lights, and a chat interface.
+            A Ruff Corp dashboard with scenes, lights, and a chat interface.
           </p>
         </div>
         <button

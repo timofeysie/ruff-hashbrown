@@ -92,7 +92,7 @@ import { PlayerPlay } from '../../icons/PlayerPlay';
         >
           <div class="nav">
             <div class="button">
-              <h3>Smart Home App</h3>
+              <h3>Ruff Corp App</h3>
             </div>
             <a
               href="https://smart-home.hashbrown.dev"
@@ -143,7 +143,7 @@ import { PlayerPlay } from '../../icons/PlayerPlay';
         >
           <div class="nav">
             <div class="button">
-              <h3>Smart Home App</h3>
+              <h3>Ruff Corp App</h3>
             </div>
             <a
               href="https://smart-home.hashbrown.dev"

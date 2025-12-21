@@ -22,7 +22,7 @@ import { openWelcomeOverlay } from './welcome';
           <a href="https://hashbrown.dev" target="_blank">
             <img src="/brand-mark.svg" alt="Hashbrown" height="32" />
           </a>
-          <h1>Smart Home</h1>
+          <h1>Ruff Corp</h1>
         </div>
         <button type="button" class="tour-button" (click)="openWelcome()">
           Welcome tour

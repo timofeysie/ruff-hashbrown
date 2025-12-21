@@ -16,6 +16,7 @@ import { Toaster } from './shared/toaster';
 import { LightsView } from './views/LightsView';
 import { ScenesView } from './views/ScenesView';
 import { ScheduledScenesView } from './views/ScheduledScenesView';
+import { Dashboard } from './components/dashboard/Dashboard';
 
 export function App() {
   const url = 'http://localhost:3000/api/chat';
@@ -66,7 +67,7 @@ export function App() {
                     path="/scheduled-scenes"
                     element={<ScheduledScenesView />}
                   />
-                  <Route path="/" element={<p>Home</p>} />
+                  <Route path="/" element={<Dashboard />} />
                 </Routes>
               </div>
             </div>
