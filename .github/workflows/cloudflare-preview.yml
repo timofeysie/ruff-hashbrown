@@ -3,7 +3,7 @@ name: Deploy Cloudflare Previews
 on:
   push:
     branches:
-      - main
+      - develop
       
 concurrency:
   group: cloudflare-preview
