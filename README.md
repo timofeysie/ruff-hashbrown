@@ -172,18 +172,6 @@ For React: https://hashbrown.dev/docs/react/start/intro
 
 To enable demonstration, ideation and development, we've added several sample apps to the repo. These apps have state, reactivity, etc., just like a full-fledged app. They also each include a simple backend server to enable using LLM providers, but they don't generally include persistence, etc.
 
-### Angular Smart Home
-
-An Angular-based smart home app that can control lights, create and apply scenes and schedule events. Users can interact with a chat prompt that can render lights, scenes, etc. right in the chat.
-
-Smart-home-server is set up to use OpenAI (you'll just need to provide your API key as an environment variable), but can be quickly adapted to any of our other backend wrappers.
-
-```shell
-nvm use
-npm install
-npx nx serve smart-home-server && npx nx serve smart-home-angular
-```
-
 ### React Smart Home
 
 A React-based smart home app that can control lights, create and apply scenes and schedule events. Users can interact with a chat prompt that can render lights, scenes, etc. right in the chat.

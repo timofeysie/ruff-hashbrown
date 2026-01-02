@@ -1,6 +1,8 @@
 # Example Features: Adding Delete Functionality to Hashbrown Chat
 
-This guide demonstrates how to add delete functionality to a Hashbrown chat interface using tools. We'll use the smart-home React sample as our example, showing how to enable the AI to delete lights directly.
+This guide demonstrates how to add a delete light function to the Hashbrown chat interface using tools.
+
+Initially, the smart-home React sample AI chat will not delete a light if you ask it to.  To create this functionality, we will have to enable the delete feature and create a tool to allow the chat to use it.
 
 ---
 

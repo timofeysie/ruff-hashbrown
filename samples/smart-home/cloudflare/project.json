@@ -1,7 +1,7 @@
 {
   "name": "smart-home-cloudflare",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "samples/smart-home/angular/functions",
+  "sourceRoot": "samples/smart-home/cloudflare/functions",
   "projectType": "application",
   "targets": {
     "build": {
@@ -14,7 +14,7 @@
         "format": ["esm"],
         "bundle": true,
         "thirdParty": true,
-        "main": "samples/smart-home/angular/functions/api/chat.ts",
+        "main": "samples/smart-home/cloudflare/functions/api/chat.ts",
         "mainOutputFilename": "api/chat.js",
         "additionalEntryPoints": [],
         "tsConfig": "samples/smart-home/cloudflare/tsconfig.app.json",
@@ -23,7 +23,7 @@
           "sourcemap": true,
           "mainFields": ["browser", "module", "main"],
           "conditions": ["browser"],
-          "outbase": "samples/smart-home/angular/functions",
+          "outbase": "samples/smart-home/cloudflare/functions",
           "outExtension": {
             ".js": ".js"
           }
