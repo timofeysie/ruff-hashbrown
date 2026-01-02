@@ -21,7 +21,7 @@ import { Light } from '../models/light.model';
 export const RichChatPanel = () => {
   const getLights = useTool({
     name: 'getLights',
-    description: 'Get the current lights',
+    description: 'Get the current lights. Returns an array of light objects, each with an id (string), name (string), and brightness (number). Use the id field when calling other tools like deleteLight or controlLight.',
     handler: () => Promise.resolve(useSmartHomeStore.getState().lights),
     deps: [],
   });
@@ -40,6 +40,35 @@ export const RichChatPanel = () => {
       });
 
       return Promise.resolve(true);
+    },
+    deps: [],
+  });
+  const deleteLight = useTool({
+    name: 'deleteLight',
+    description: 'Delete a light by its id. You must first call getLights to find the light by name, then use the id field from that light object. The lightId must be the exact id string from the light object. Returns the deleted light id if successful, or an error if the light was not found.',
+    schema: s.object('Delete light input', {
+      lightId: s.string('The id of the light to delete. This must be the exact id string from the light object returned by getLights.'),
+    }),
+    handler: (input) => {
+      const { lightId } = input;
+      const store = useSmartHomeStore.getState();
+      const light = store.lights.find((l) => l.id === lightId);
+
+      if (!light) {
+        return Promise.reject(
+          new Error(
+            `Light with id "${lightId}" not found. Make sure to call getLights first to get the correct light id.`,
+          ),
+        );
+      }
+
+      store.deleteLight(lightId);
+
+      return Promise.resolve({
+        success: true,
+        deletedLightId: lightId,
+        deletedLightName: light.name,
+      });
     },
     deps: [],
   });
@@ -91,6 +120,9 @@ export const RichChatPanel = () => {
       Always prefer writing a single script for the javascript tool over calling 
       the javascript tool multiple times.
 
+      ### IMPORTANT: Use Tools for Actions
+      When the user asks you to perform an action (delete, update, control), **always use the appropriate tool** (deleteLight, controlLight, etc.) to perform the action directly. Never show buttons for actions you can perform with tools.
+
       ### EXAMPLES
 
       <user>What are the lights in the living room?</user>
@@ -105,8 +137,30 @@ export const RichChatPanel = () => {
           </Card>
         </ui>
       </assistant>
+
+      <user>Delete the kitchen light</user>
+      <assistant>
+        <tool-call>getLights</tool-call>
+      </assistant>
+      <assistant>
+        <tool-call>deleteLight</tool-call>
+      </assistant>
+      <assistant>
+        <ui>
+          <Markdown>I have deleted the kitchen light.</Markdown>
+        </ui>
+      </assistant>
+
+      ### CRITICAL: Finding Lights by Name to Delete
+      When the user asks to delete a light by name (e.g., "Delete the kitchen light" or "Remove the bedroom light"):
+      1. ALWAYS call getLights first - This returns an array of light objects, each with: id (string), name (string), and brightness (number)
+      2. Find the matching light - Search the array for a light where the name matches the user's request (case-insensitive, partial matches are acceptable)
+      3. Extract the id - Use the exact id string from the matching light object
+      4. Call deleteLight - Pass that exact id as the lightId parameter
+      5. NEVER guess IDs - You must always call getLights first to get the actual ID. Never use made-up IDs or try to construct them.
+      6. If no match found - Tell the user the light was not found rather than trying to delete with a guessed ID
     `,
-    tools: [getLights, controlLight, toolJavaScript],
+    tools: [getLights, controlLight, deleteLight, toolJavaScript],
     components: [
       exposeComponent(LightChatComponent, {
         name: 'LightChat',
