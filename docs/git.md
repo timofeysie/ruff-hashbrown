@@ -129,6 +129,47 @@ This means there's a secret (API key) in your commit history. You need to remove
 - The `.env` file should already be in `.gitignore` to prevent this in the future.
 - After removing the secret, make sure your local `.env` file contains only placeholder values or is excluded from commits.
 
+### Verify Secrets Are Removed from History
+
+After removing secrets from history, verify they're gone before pushing:
+
+**1. Check if `.env` exists in any commit:**
+```bash
+git log --all --full-history --source -- .env
+```
+If this returns nothing, `.env` is not in history.
+
+**2. Search for API key patterns in commit history:**
+```bash
+# Search for OpenAI API key pattern (starts with sk-)
+git log --all -S "sk-" --source --all
+
+# Or search for the specific environment variable
+git log --all -S "OPENAI_API_KEY" --source --all
+```
+
+**3. Check a specific commit (if you know the hash):**
+```bash
+git show <commit-hash>:.env
+```
+If it says "fatal: invalid object name" or "path does not exist", the file isn't in that commit.
+
+**4. Test by attempting to push:**
+The most reliable test is to try pushing. If GitHub's secret scanning doesn't detect anything, the push will succeed:
+```bash
+git push origin develop
+```
+
+**5. Use GitHub's secret scanning (if you have access):**
+Check your repository's Security tab → Secret scanning alerts to see if any secrets are detected.
+
+**Current Status Check:**
+```bash
+# Verify .env is not in current HEAD
+git show HEAD:.env
+```
+If this returns "fatal: path '.env' exists on disk, but not in 'HEAD'", the file exists locally but is not tracked in git (which is correct).
+
 ### Alternative: Use GitHub's Secret Allowlist (Not Recommended)
 
 If the secret is no longer valid/used, you can temporarily allow it through GitHub's interface using the URL provided in the error message. However, **removing it from history is the recommended approach**.
