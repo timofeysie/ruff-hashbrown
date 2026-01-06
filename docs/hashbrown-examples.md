@@ -1,4 +1,6 @@
-# Example Features: Adding Delete Functionality to Hashbrown Chat
+# Example Features
+
+## Adding Delete Functionality to Hashbrown Chat
 
 This guide demonstrates how to add a delete light function to the Hashbrown chat interface using tools.
 
@@ -446,3 +448,32 @@ By implementing a tool for delete functionality, you enable the AI to:
 - Avoid showing buttons that users must click
 
 This creates a more natural and powerful chat experience where the AI can perform actions directly based on user requests.
+
+## Adding a scene
+
+We want to AI to be able to respond to a prompt like this:
+
+*Open the “Add Scene” modal on the scenes page, enter the name “New Scene” and open the scene lights select and choose “Office Light” please.*
+
+However, the response will be something like *"I'm unable to open modals or directly interact with scenes."*
+
+First, lets enable the AIs ability to 0pen the “Add Scene” modal.  To do this we need to create a new trigger.  Lets call it AddSceneDialogTrigger and add it to the /src/app/views/components directory.
+
+The `AddSceneDialogTrigger` component should automatically open the Add Scene dialog when rendered by the AI. The component:
+
+1. **Wraps the existing `SceneDialogForm`** - Reuses the existing dialog component that handles scene creation
+2. **Auto-triggers on render** - Uses a hidden button that automatically clicks when the component mounts, opening the dialog
+3. **Exposed to the AI** - Added to the `RichChatPanel` using `exposeComponent()` as the `<AddScene>` component
+4. **System prompt updated** - Added instructions telling the AI when to use the component (e.g., when users ask to "add a scene", "create a new scene", etc.)
+
+When a user asks to add or create a scene, the AI can now render `<AddScene />` which will automatically open the Add Scene modal, allowing the user to:
+- Enter a scene name
+- Select lights to add to the scene
+- Configure brightness levels
+- Get AI-powered recommendations for which lights to include based on the scene name
+
+This approach uses a **component** rather than a **tool** because opening a modal is a UI interaction that requires user input to complete the scene configuration. The AI can trigger the modal, but at the moment, the user must complete the form.
+
+Next, lets enable the AI to open the select and choose an item automatically.
+
+

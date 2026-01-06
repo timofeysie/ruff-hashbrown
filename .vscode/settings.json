@@ -1,3 +1,23 @@
 {
-  "nxConsole.generateAiAgentRules": true
+  "nxConsole.generateAiAgentRules": true,
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#b1e3cc",
+    "activityBar.background": "#b1e3cc",
+    "activityBar.foreground": "#15202b",
+    "activityBar.inactiveForeground": "#15202b99",
+    "activityBarBadge.background": "#a372cc",
+    "activityBarBadge.foreground": "#15202b",
+    "commandCenter.border": "#15202b99",
+    "sash.hoverBorder": "#b1e3cc",
+    "statusBar.background": "#8bd6b3",
+    "statusBar.foreground": "#15202b",
+    "statusBarItem.hoverBackground": "#65c99a",
+    "statusBarItem.remoteBackground": "#8bd6b3",
+    "statusBarItem.remoteForeground": "#15202b",
+    "titleBar.activeBackground": "#8bd6b3",
+    "titleBar.activeForeground": "#15202b",
+    "titleBar.inactiveBackground": "#8bd6b399",
+    "titleBar.inactiveForeground": "#15202b99"
+  },
+  "peacock.color": "#8bd6b3"
 }

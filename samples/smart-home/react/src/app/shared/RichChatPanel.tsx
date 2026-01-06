@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSmartHomeStore } from '../store/smart-home.store';
 import { LightChatComponent } from '../views/components/LightChatComponent';
+import { AddSceneDialogTrigger } from '../views/components/AddSceneDialogTrigger';
 import { Button } from './button';
 import { CardComponent } from './CardComponent';
 import { MarkdownComponent } from './MarkdownComponent';
@@ -159,6 +160,18 @@ export const RichChatPanel = () => {
       4. Call deleteLight - Pass that exact id as the lightId parameter
       5. NEVER guess IDs - You must always call getLights first to get the actual ID. Never use made-up IDs or try to construct them.
       6. If no match found - Tell the user the light was not found rather than trying to delete with a guessed ID
+
+      ### Opening the Add Scene Dialog
+      When the user asks to add, create, or make a new scene (e.g., "Add a scene", "Create a new scene", "I want to make a scene"):
+      - Use the <AddScene> component to open the Add Scene dialog
+      - The dialog will allow the user to configure the scene name and select lights
+      - Example:
+        <user>Add a new scene</user>
+        <assistant>
+          <ui>
+            <AddScene />
+          </ui>
+        </assistant>
     `,
     tools: [getLights, controlLight, deleteLight, toolJavaScript],
     components: [
@@ -182,6 +195,10 @@ export const RichChatPanel = () => {
           title: s.string('The title of the card'),
           description: s.streaming.string('The description of the card'),
         },
+      }),
+      exposeComponent(AddSceneDialogTrigger, {
+        name: 'AddScene',
+        description: 'Open the Add Scene dialog to allow the user to create a new scene. Use this when the user asks to add, create, or make a new scene.',
       }),
     ],
   });
