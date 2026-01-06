@@ -1,6 +1,6 @@
 import { s } from '@hashbrownai/core';
 import { useStructuredCompletion } from '@hashbrownai/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   SceneLight as SceneLightModel,
@@ -35,6 +35,8 @@ import { CircleAlert } from 'lucide-react';
 
 interface SceneDialogFormProps {
   scene?: SceneModel;
+  initialSceneName?: string;
+  initialLights?: SceneLightModel[];
 }
 
 export const SceneDialogForm = (
@@ -42,17 +44,24 @@ export const SceneDialogForm = (
     children: React.ReactNode;
   },
 ) => {
-  const { scene, children } = props;
+  const { scene, children, initialSceneName, initialLights } = props;
 
   const addScene = useSmartHomeStore((state) => state.addScene);
   const updateScene = useSmartHomeStore((state) => state.updateScene);
   const lights = useSmartHomeStore((state) => state.lights);
 
-  const [sceneName, setSceneName] = useState(scene?.name || '');
+  const [sceneName, setSceneName] = useState(
+    scene?.name || initialSceneName || '',
+  );
+  // Don't add initialLights to state immediately if we want to animate the selection
+  // Instead, we'll add them after the animation
   const [sceneLights, setSceneLights] = useState<SceneLightModel[]>(
     scene?.lights || [],
   );
   const [open, setOpen] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [selectValue, setSelectValue] = useState<string>('');
+  const [hasAnimatedInitialLights, setHasAnimatedInitialLights] = useState(false);
 
   const input = useMemo(() => {
     if (!open) return null;
@@ -100,11 +109,90 @@ export const SceneDialogForm = (
   );
 
   const handleAddLight = (lightId: string) => {
+    // Don't add if light is already in the scene (prevents duplicates)
+    if (sceneLights.some((sceneLight) => sceneLight.lightId === lightId)) {
+      setSelectValue(''); // Reset select value
+      return;
+    }
+
     const light = lights.find((l) => l.id === lightId);
     if (light) {
       setSceneLights([...sceneLights, { lightId, brightness: 100 }]);
+      // Reset select value after adding
+      setSelectValue('');
     }
   };
+
+  // Auto-open select and select items when initialLights are provided and dialog opens
+  // This creates a visual animation showing the select opening and selecting the light
+  useEffect(() => {
+    if (open && initialLights && initialLights.length > 0 && !hasAnimatedInitialLights) {
+      // Find the first light from initialLights that exists in the lights array
+      const lightToAnimate = initialLights.find((initialLight) =>
+        lights.some((light) => light.id === initialLight.lightId),
+      );
+
+      if (lightToAnimate) {
+        // Small delay to ensure the dialog is fully rendered
+        const timer = setTimeout(() => {
+          setSelectValue(lightToAnimate.lightId);
+          setSelectOpen(true);
+          // After a brief moment, add the light and close the select
+          setTimeout(() => {
+            // Add the light using functional update to ensure we have latest state
+            setSceneLights((prev) => {
+              // Check if light is already added (shouldn't be, but defensive)
+              if (prev.some((sceneLight) => sceneLight.lightId === lightToAnimate.lightId)) {
+                return prev;
+              }
+              return [...prev, { lightId: lightToAnimate.lightId, brightness: 100 }];
+            });
+            // Close the select after adding
+            setTimeout(() => {
+              setSelectOpen(false);
+              setSelectValue('');
+              setHasAnimatedInitialLights(true);
+              // Add any remaining initialLights that weren't animated
+              setSceneLights((prev) => {
+                const remainingLights = initialLights
+                  .slice(1)
+                  .filter(
+                    (light) =>
+                      !prev.some(
+                        (sceneLight) => sceneLight.lightId === light.lightId,
+                      ),
+                  );
+                if (remainingLights.length > 0) {
+                  return [...prev, ...remainingLights];
+                }
+                return prev;
+              });
+            }, 300);
+          }, 500); // Wait before selecting
+        }, 100);
+
+        return () => clearTimeout(timer);
+      } else {
+        // If no light to animate, just add all initialLights
+        setSceneLights((prev) => [...prev, ...initialLights]);
+        setHasAnimatedInitialLights(true);
+      }
+    } else if (open && initialLights && initialLights.length > 0 && hasAnimatedInitialLights) {
+      // If we've already animated, just ensure all initialLights are added
+      setSceneLights((prev) => {
+        const missingLights = initialLights.filter(
+          (light) =>
+            !prev.some(
+              (sceneLight) => sceneLight.lightId === light.lightId,
+            ),
+        );
+        if (missingLights.length > 0) {
+          return [...prev, ...missingLights];
+        }
+        return prev;
+      });
+    }
+  }, [open, initialLights, lights, hasAnimatedInitialLights]);
 
   const handleUpdateLightBrightness = (lightId: string, brightness: number) => {
     setSceneLights(
@@ -182,7 +270,12 @@ export const SceneDialogForm = (
 
             {availableLights.length > 0 && (
               <div className="grid gap-2">
-                <Select onValueChange={handleAddLight}>
+                <Select
+                  open={selectOpen}
+                  onOpenChange={setSelectOpen}
+                  value={selectValue}
+                  onValueChange={handleAddLight}
+                >
                   <SelectTrigger id="addLight" className="w-full">
                     <SelectValue placeholder="Select a light to add" />
                   </SelectTrigger>

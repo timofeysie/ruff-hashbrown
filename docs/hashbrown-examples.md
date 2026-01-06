@@ -474,6 +474,176 @@ When a user asks to add or create a scene, the AI can now render `<AddScene />` 
 
 This approach uses a **component** rather than a **tool** because opening a modal is a UI interaction that requires user input to complete the scene configuration. The AI can trigger the modal, but at the moment, the user must complete the form.
 
-Next, lets enable the AI to open the select and choose an item automatically.
+## Opening a select
+
+Next, lets enable the AI to open the "Scene Lights" select and choose an item automatically.
+
+To enable the AI to open the "Scene Lights" select and automatically choose a light, we need to:
+
+1. Make the Select component controlled (so we can programmatically open it and set its value)
+2. Delay adding `initialLights` to the scene state (so they remain in `availableLights` and the Select can render)
+3. Animate the selection process (open the select, show the selection, then add the light)
+
+### Step 1: Make the Select Controlled
+
+In `SceneDialogForm.tsx`, we made the Select component controlled by adding state for `selectOpen` and `selectValue`:
+
+```typescript:samples/smart-home/react/src/app/views/components/SceneDialogForm.tsx
+const [selectOpen, setSelectOpen] = useState(false);
+const [selectValue, setSelectValue] = useState<string>('');
+```
+
+Then we connected these to the Select component:
+
+```typescript:samples/smart-home/react/src/app/views/components/SceneDialogForm.tsx
+<Select
+  open={selectOpen}
+  onOpenChange={setSelectOpen}
+  value={selectValue}
+  onValueChange={handleAddLight}
+>
+  <SelectTrigger id="addLight" className="w-full">
+    <SelectValue placeholder="Select a light to add" />
+  </SelectTrigger>
+  <SelectContent>
+    {/* ... */}
+  </SelectContent>
+</Select>
+```
+
+### Step 2: Delay Adding Initial Lights
+
+The key insight is that if `initialLights` are added to `sceneLights` immediately, they won't be in `availableLights` (which filters out lights already in the scene). This means the Select won't render because `availableLights.length === 0`.
+
+To fix this, we don't add `initialLights` to the initial state:
+
+```typescript:samples/smart-home/react/src/app/views/components/SceneDialogForm.tsx
+// Don't add initialLights to state immediately if we want to animate the selection
+// Instead, we'll add them after the animation
+const [sceneLights, setSceneLights] = useState<SceneLightModel[]>(
+  scene?.lights || [], // Note: NOT initialLights || []
+);
+```
+
+### Step 3: Animate the Selection
+
+We use a `useEffect` to animate the selection when the dialog opens with `initialLights`:
+
+```typescript:samples/smart-home/react/src/app/views/components/SceneDialogForm.tsx
+useEffect(() => {
+  if (open && initialLights && initialLights.length > 0 && !hasAnimatedInitialLights) {
+    // Find the first light from initialLights that exists in the lights array
+    const lightToAnimate = initialLights.find((initialLight) =>
+      lights.some((light) => light.id === initialLight.lightId),
+    );
+
+    if (lightToAnimate) {
+      // Small delay to ensure the dialog is fully rendered
+      const timer = setTimeout(() => {
+        setSelectValue(lightToAnimate.lightId);
+        setSelectOpen(true);
+        // After a brief moment, add the light and close the select
+        setTimeout(() => {
+          // Add the light using functional update to ensure we have latest state
+          setSceneLights((prev) => {
+            // Check if light is already added (shouldn't be, but defensive)
+            if (prev.some((sceneLight) => sceneLight.lightId === lightToAnimate.lightId)) {
+              return prev;
+            }
+            return [...prev, { lightId: lightToAnimate.lightId, brightness: 100 }];
+          });
+          // Close the select after adding
+          setTimeout(() => {
+            setSelectOpen(false);
+            setSelectValue('');
+            setHasAnimatedInitialLights(true);
+            // Add any remaining initialLights that weren't animated
+            setSceneLights((prev) => {
+              const remainingLights = initialLights
+                .slice(1)
+                .filter(
+                  (light) =>
+                    !prev.some(
+                      (sceneLight) => sceneLight.lightId === light.lightId,
+                    ),
+                );
+              if (remainingLights.length > 0) {
+                return [...prev, ...remainingLights];
+              }
+              return prev;
+            });
+          }, 300);
+        }, 500); // Wait before selecting
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }
+}, [open, initialLights, lights, hasAnimatedInitialLights]);
+```
+
+### Step 4: Prevent Duplicate Adds
+
+We also added a check in `handleAddLight` to prevent adding lights that are already in the scene:
+
+```typescript:samples/smart-home/react/src/app/views/components/SceneDialogForm.tsx
+const handleAddLight = (lightId: string) => {
+  // Don't add if light is already in the scene (prevents duplicates)
+  if (sceneLights.some((sceneLight) => sceneLight.lightId === lightId)) {
+    setSelectValue(''); // Reset select value
+    return;
+  }
+
+  const light = lights.find((l) => l.id === lightId);
+  if (light) {
+    setSceneLights([...sceneLights, { lightId, brightness: 100 }]);
+    // Reset select value after adding
+    setSelectValue('');
+  }
+};
+```
+
+This is important because when we programmatically set `selectValue`, it triggers `onValueChange={handleAddLight}`, which could add the light again if we didn't check.
+
+### How It Works
+
+When the AI renders `<AddScene lightIds={["office-light-id"]} />`:
+
+1. **Dialog Opens** - `AddSceneDialogTrigger` auto-clicks the button, opening the dialog
+2. **Initial State** - `sceneLights` starts empty (not including `initialLights`)
+3. **Select Renders** - Because the light isn't in `sceneLights` yet, it's in `availableLights`, so the Select renders
+4. **Animation Begins** - After 100ms, the `useEffect` sets `selectValue` and `selectOpen(true)`
+5. **Select Opens** - The Select dropdown opens, showing the available lights
+6. **Light Selected** - The light appears selected in the dropdown
+7. **Light Added** - After 500ms, the light is added to `sceneLights` via `setSceneLights`
+8. **Select Closes** - After another 300ms, the select closes and resets
+
+### Key Points
+
+- **Controlled Components** - The Select must be controlled (`open`, `value`, `onValueChange`) to allow programmatic interaction
+- **State Timing** - Don't add `initialLights` to initial state if you want to animate the selection
+- **Functional Updates** - Use `setSceneLights((prev) => ...)` to avoid stale closures
+- **Duplicate Prevention** - Check if a light is already in the scene before adding it
+- **Animation Timing** - Use multiple `setTimeout` calls with appropriate delays to create a smooth animation
+
+### Complete Flow Example
+
+```
+User: "open the Scene Lights select and choose Office Light please"
+
+AI: [Calls getLights tool]
+    [Receives: [{ id: "office-light-id", name: "Office Light", ... }, ...]]
+    [Finds "Office Light" and extracts id: "office-light-id"]
+    [Renders] <AddScene lightIds={["office-light-id"]} />
+
+Result:
+1. Modal opens
+2. Select dropdown opens automatically
+3. "Office Light" appears selected
+4. Light is added to the scene
+5. Select closes
+```
+
+This creates a smooth, visual experience where the user can see the AI's selection process in action, making it clear that the AI understood their request and acted on it.
 
 

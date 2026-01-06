@@ -165,11 +165,40 @@ export const RichChatPanel = () => {
       When the user asks to add, create, or make a new scene (e.g., "Add a scene", "Create a new scene", "I want to make a scene"):
       - Use the <AddScene> component to open the Add Scene dialog
       - The dialog will allow the user to configure the scene name and select lights
-      - Example:
+      - You can optionally pre-fill the scene name and automatically add lights by passing props
+      - Examples:
         <user>Add a new scene</user>
         <assistant>
           <ui>
             <AddScene />
+          </ui>
+        </assistant>
+
+        <user>Create a scene called "Evening" with the kitchen light</user>
+        <assistant>
+          <tool-call>getLights</tool-call>
+        </assistant>
+        <assistant>
+          <ui>
+            <AddScene sceneName="Evening" lightIds={["kitchen-light-id"]} />
+          </ui>
+        </assistant>
+
+      ### Adding Lights to a Scene
+      When the user asks to add specific lights to a scene:
+      1. ALWAYS call getLights first to get the list of available lights and their IDs
+      2. Find the matching lights by name (case-insensitive, partial matches acceptable)
+      3. Extract the exact id strings from the matching light objects
+      4. Use the <AddScene> component with the lightIds prop containing an array of those IDs
+      5. You can also set the sceneName prop if the user specified a name
+      6. Example:
+        <user>Open the Add Scene modal and add the Office Light</user>
+        <assistant>
+          <tool-call>getLights</tool-call>
+        </assistant>
+        <assistant>
+          <ui>
+            <AddScene lightIds={["office-light-id-from-getLights"]} />
           </ui>
         </assistant>
     `,
@@ -198,7 +227,20 @@ export const RichChatPanel = () => {
       }),
       exposeComponent(AddSceneDialogTrigger, {
         name: 'AddScene',
-        description: 'Open the Add Scene dialog to allow the user to create a new scene. Use this when the user asks to add, create, or make a new scene.',
+        description: 'Open the Add Scene dialog to allow the user to create a new scene. Use this when the user asks to add, create, or make a new scene. You can optionally pre-fill the scene name and automatically add lights by passing sceneName and lightIds props. The lightIds should be an array of light ID strings (call getLights first to get the correct IDs).',
+        props: {
+          sceneName: s.anyOf([
+            s.string('The name for the new scene'),
+            s.nullish(),
+          ]),
+          lightIds: s.anyOf([
+            s.array(
+              'Array of light IDs to automatically add to the scene',
+              s.string('The ID of a light to add'),
+            ),
+            s.nullish(),
+          ]),
+        },
       }),
     ],
   });
