@@ -217,3 +217,68 @@ This should eliminate the duplicate and the console warning.
 
 
 Now we are back to the select not opening and nothing selected with the prompt: "open the "Scene Lights" select and choose “Office Light” please."
+
+## Press the add scene button in the modal to confirm the new scene
+
+```
+```[plugin:vite:react-babel] /Users/timo/repos/temp/hashbrown/samples/smart-home/react/src/app/shared/RichChatPanel.tsx: Identifier 'setInputValue' has already been declared. (407:21)
+  410 |   useEffect(() => {
+/Users/timo/repos/temp/hashbrown/samples/smart-home/react/src/app/shared/RichChatPanel.tsx:407:21
+405 |  
+406 |    // Add state for the textarea input
+407 |    const [inputValue, setInputValue] = useState('');
+    |                       ^
+408 |  
+409 |    // Auto-scroll to bottom when messages change```
+```
+
+Fixed the naming conflict. The tool setInputValue conflicted with the setInputValue from useState for the textarea.
+Renamed the tool to setFormInputValue and updated:
+The tool definition
+The tools array
+The system prompt examples
+The conflict is resolved, and the code should compile. The tool name is more specific and clearly indicates it's for form inputs, not the chat textarea.
+
+Now the error is gone.  However, with the prompt" Open the “Add Scene” modal on the scenes page, enter the name “New Scene” and open the scene lights select and choose “Office Light” please.
+Then press the add scene button in the modal to confirm the new scene." a modal appears, is filled in, but instead of the "Add Scene" button being pressed to complete the operation, it appears that the select is opened again underneath a second modal which appears over the first, which is all wrong.
+
+Made several fixes:
+Improved selectOptionByText:
+Checks if the select is already open before clicking
+Waits 200ms after selecting to ensure the dropdown closes
+Better handling when the select is already open
+Improved clickButtonByText:
+Closes any open select dropdowns first (presses Escape)
+Filters out buttons inside dropdowns/portals
+Only targets visible buttons in the main modal
+Updated system prompt: Added instructions to avoid re-interacting with the select after clicking the button
+The "second modal" issue was likely the select dropdown portal still being open when clicking the button. The tool now:
+Closes any open dropdowns before clicking
+Waits for the dropdown to close after selection
+Filters out buttons inside portals/dropdowns
+Try the prompt again. The workflow should:
+Open the modal
+Fill in the scene name
+Select the light (and wait for the dropdown to close)
+Click "Add Scene" (after closing any open dropdowns)
+This should prevent the select from reopening and avoid the second modal issue.
+
+But it doesn't.  The select is again opened a second time, and then a new modal appears over the first modal.
+
+Made the tools more defensive:
+Better select closing: Multiple Escape key presses and verification that the select is closed
+Better button filtering: Excludes hidden buttons (like the trigger in AddSceneDialogTrigger) and buttons inside select portals
+Native click method: Uses .click() instead of synthetic events for better React compatibility
+Double-checking: Verifies the select is closed before clicking the button
+The "second modal" issue might be the select dropdown portal appearing as a modal overlay. The code now:
+Closes any open selects before clicking buttons
+Waits for selects to fully close
+Filters out buttons in portals/dropdowns
+Uses native click events
+If the issue persists, it may be that the AI is calling selectOptionByText again after clicking the button. The system prompt already instructs against this, but we can add more safeguards if needed.
+Try the prompt again. The workflow should:
+Open the modal
+Fill in the scene name
+Select the light (and wait for the dropdown to close)
+Click "Add Scene" (after ensuring all dropdowns are closed)
+This should prevent the select from reopening and avoid the second modal issue.

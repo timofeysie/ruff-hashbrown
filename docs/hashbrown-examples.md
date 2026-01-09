@@ -1,21 +1,64 @@
 # Example Features
 
-## Adding Delete Functionality to Hashbrown Chat
+We want an in-app chat AI agent to be able to perform actions in the app.
+We could implement our own custom solution for this, but thankfully, some very experienced developers are creating a framework which will allow us to add this kind of functionality to an app.  This framework is called [Hashbrown](https://hashbrown.dev/).  It hasn't taken off yet, but I believe it will.  When I first had some time to try it out, it had about 300 stars on GitHub.  The repo a few weeks later now has over 500 stars indicating a  slowly growing awareness of it.
 
-This guide demonstrates how to add a delete light function to the Hashbrown chat interface using tools.
+In this guide, I explore what it takes to add functionality to the demo React app
 
-Initially, the smart-home React sample AI chat will not delete a light if you ask it to.  To create this functionality, we will have to enable the delete feature and create a tool to allow the chat to use it.
+Lets find out how to add functionality to allow the AI Chat agent to perform actions on the React UI.
+
+Initially, the smart-home React sample AI chat will not perform actions by using the components you see in the UI.  For example if you ask in the chat to delete a light, it will apologize and say that is not something it can do.
+
+To create this functionality, we will have to enable the delete feature and create a tool to allow the chat to use it.  For this we will add a delete light function to the chat interface using tools.
+
+We would also like the AI to be able to respond to this kind of prompt:
+
+*Open the "Add Scene" modal on the scenes page, enter the name "New Scene" and open the scene lights select and choose "Office Light".  Then press the add scene button in the modal to confirm the new scene.*
 
 ---
 
-## Understanding Components vs Tools
+## Table of Contents
+
+- [Understanding Components, Tools and Triggers](#understanding-components-tools-and-triggers)
+- [Creating a Delete Tool](#creating-a-delete-tool)
+  - [Step 1: Create the Delete Light Tool](#step-1-create-the-delete-light-tool)
+  - [Step 2: Add the Tool to the Chat Panel](#step-2-add-the-tool-to-the-chat-panel)
+  - [Step 3: Update the System Prompt](#step-3-update-the-system-prompt)
+- [Best Practices](#best-practices)
+- [Summary](#summary)
+- [Adding a scene](#adding-a-scene)
+- [Opening a select](#opening-a-select)
+  - [Step 1: Make the Select Controlled](#step-1-make-the-select-controlled)
+  - [Step 2: Delay Adding Initial Lights](#step-2-delay-adding-initial-lights)
+  - [Step 3: Animate the Selection](#step-3-animate-the-selection)
+  - [Step 4: Prevent Duplicate Adds](#step-4-prevent-duplicate-adds)
+- [Enabling the Add scene button](#enabling-the-add-scene-button)
+  - [Create the `clickButtonByText` Tool](#create-the-clickbuttonbytext-tool)
+  - [Add the Tool to the Chat Panel](#add-the-tool-to-the-chat-panel)
+  - [Update the System Prompt](#update-the-system-prompt)
+- [Conclusion](#conclusion)
+
+---
+
+## Understanding Components, Tools and Triggers
 
 Before we begin, it's important to understand the difference:
 
-- **Components** (`exposeComponent()`) - UI elements that the AI can render. The AI cannot directly interact with them; users must click buttons or interact with the UI.
-- **Tools** (`useTool()`) - Functions that the AI can call directly to perform actions programmatically.
+- **Components** (`exposeComponent()`) - UI elements that the AI can render. The AI cannot directly interact with them; users must click buttons or interact with the UI. Examples: displaying cards, markdown content, or interactive controls that require user input.
+- **Tools** (`useTool()`) - Functions that the AI can call directly to perform actions programmatically. The AI executes these functions automatically when appropriate. Examples: deleting items, updating data, querying information.
+- **Triggers** (`exposeComponent()` with `useEffect` & `useRef`) - Control component state to programmatically control UI. They combine the declarative nature of components with the automatic execution of tools.  The "auto-action" is a React pattern: `useEffect()` to run side effects on mount or when dependencies change and `useRef()` to access DOM elements.
+- **DOM Interaction Tools** (`useTool()` with DOM manipulation) - Tools that directly interact with the DOM to perform UI actions like clicking buttons, filling inputs, or selecting dropdown options. These are used when you need the AI to interact with existing UI elements that are already rendered (e.g., clicking a button in an open modal). Unlike triggers which use React patterns, DOM interaction tools use `document.querySelector()`, `getElementById()`, and native DOM methods.
+- **Component schemas** — Hashbrown's way of describing component props to the AI.
 
 **For delete functionality, you should use a tool**, not a component. This allows the AI to delete items directly when asked (e.g., "Delete the kitchen light"), rather than just showing a button that the user must click.
+
+**For opening modals or dialogs**, you should use a **trigger component**. This allows the AI to open UI elements programmatically (e.g., "Open the Add Scene modal"), but the user still completes the form or interaction. Triggers are useful when you want the AI to initiate a workflow that requires user input to complete.
+
+**For interacting with elements in already-open modals** (like clicking buttons or filling form fields), you should use **DOM interaction tools**. These allow the AI to programmatically interact with rendered UI elements when React state management or component patterns aren't sufficient.
+
+<image of chat with components ready for the user to complete an action>
+
+In our case, we want the AI to open the UI elements and automatically carry out the prompt instructions.  For this we will use a Hashbrown `useTool()` hook.
 
 ---
 
@@ -167,206 +210,7 @@ system: prompt`
 - Never show buttons for actions that can be performed with tools
 - The AI should call the tool directly, then confirm with a message
 
----
-
-## Why Not Expose a Delete Component?
-
-You might wonder why we don't also expose a `DeleteLightButton` component. The reason is:
-
-1. **User Experience** - Users expect the AI to perform actions directly when asked, not show buttons they must click
-2. **AI Capability** - The AI cannot click buttons; it can only call tools
-3. **Clarity** - By only providing tools for actions, we make it clear to the AI that it should perform the action directly
-
-If you want to show a delete button in your UI for manual deletion, you can add it to your regular (non-chat) UI components. But for chat interactions, tools are the right approach.
-
----
-
-## How It Works
-
-When a user asks to delete a light:
-
-1. **AI calls getLights** - The AI first calls `getLights` to retrieve all lights and their IDs
-2. **AI finds the light** - The AI searches the returned array to find the light matching the user's request by name
-3. **AI extracts the ID** - The AI extracts the exact `id` string from the matching light object
-4. **AI calls deleteLight** - The AI calls `deleteLight` with the exact `lightId` from step 3
-5. **Tool executes** - The handler validates the light exists, then calls your store to delete it
-6. **AI confirms** - The AI renders a confirmation message using a markdown component
-
-**Example Flow:**
-
-```
-User: "Delete the kitchen light"
-
-AI: [Calls getLights tool]
-    [Receives: [{ id: "abc-123", name: "Kitchen Light", brightness: 50 }, ...]]
-    [Finds light where name matches "kitchen light"]
-    [Extracts id: "abc-123"]
-    [Calls deleteLight tool with lightId="abc-123"]
-    [Renders] "I have deleted the kitchen light."
-```
-
-**Important:** The AI must always call `getLights` first to get the actual light IDs. It cannot guess or construct IDs - it must retrieve them from the `getLights` response.
-
-### Error Handling
-
-The `deleteLight` tool includes error handling:
-- If the light ID is not found, it returns a clear error message
-- The error instructs the AI to call `getLights` first
-- This helps prevent the AI from trying to delete with incorrect IDs
-
----
-
-## Complete Example
-
-Here's a complete example showing how to set up the delete tool in a React chat panel:
-
-```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
-import { Chat, prompt, s } from '@hashbrownai/core';
-import {
-  exposeComponent,
-  useRuntime,
-  useRuntimeFunction,
-  useTool,
-  useToolJavaScript,
-  useUiChat,
-} from '@hashbrownai/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSmartHomeStore } from '../store/smart-home.store';
-import { LightChatComponent } from '../views/components/LightChatComponent';
-import { Button } from './button';
-import { CardComponent } from './CardComponent';
-import { MarkdownComponent } from './MarkdownComponent';
-import { RichMessage } from './RichMessage';
-import { ScrollArea } from './scrollarea';
-import { Textarea } from './textarea';
-import { Light } from '../models/light.model';
-
-export const RichChatPanel = () => {
-  const getLights = useTool({
-    name: 'getLights',
-    description: 'Get the current lights. Returns an array of light objects, each with an id (string), name (string), and brightness (number). Use the id field when calling other tools like deleteLight or controlLight.',
-    handler: () => Promise.resolve(useSmartHomeStore.getState().lights),
-    deps: [],
-  });
-
-  const controlLight = useTool({
-    name: 'controlLight',
-    description: 'Control the light. Brightness is a number between 0 and 100.',
-    schema: s.object('Control light input', {
-      lightId: s.string('The id of the light'),
-      brightness: s.number('The brightness of the light, between 0 and 100'),
-    }),
-    handler: (input) => {
-      const { lightId, brightness } = input;
-
-      useSmartHomeStore.getState().updateLight(lightId, {
-        brightness,
-      });
-
-      return Promise.resolve(true);
-    },
-    deps: [],
-  });
-
-  const deleteLight = useTool({
-    name: 'deleteLight',
-    description: 'Delete a light by its id',
-    schema: s.object('Delete light input', {
-      lightId: s.string('The id of the light to delete'),
-    }),
-    handler: (input) => {
-      const { lightId } = input;
-
-      useSmartHomeStore.getState().deleteLight(lightId);
-
-      return Promise.resolve({ success: true, deletedLightId: lightId });
-    },
-    deps: [],
-  });
-
-  // ... other tools and setup
-
-  const { messages, sendMessage, resendMessages, isSending, isReceiving, isRunningToolCalls, stop } = useUiChat({
-    model: 'gpt-4.1',
-    debugName: 'RichChatPanel',
-    system: prompt`
-      You are a smart home assistant. You can control the lights in the house. 
-      You should not stringify (aka escape) function arguments
-
-      Always prefer writing a single script for the javascript tool over calling 
-      the javascript tool multiple times.
-
-      ### IMPORTANT: Use Tools for Actions
-      When the user asks you to perform an action (delete, update, control), **always use the appropriate tool** (deleteLight, controlLight, etc.) to perform the action directly. Never show buttons for actions you can perform with tools.
-
-      ### EXAMPLES
-
-      <user>What are the lights in the living room?</user>
-      <assistant>
-        <tool-call>getLights</tool-call>
-      </assistant>
-      <assistant>
-        <ui>
-          <Card title="Living Room Lights" description="Here are the lights in the living room:">
-            <LightChat lightId="..." />
-            <LightChat lightId="..." />
-          </Card>
-        </ui>
-      </assistant>
-
-      <user>Delete the kitchen light</user>
-      <assistant>
-        <tool-call>getLights</tool-call>
-      </assistant>
-      <assistant>
-        <tool-call>deleteLight</tool-call>
-      </assistant>
-      <assistant>
-        <ui>
-          <Markdown>I have deleted the kitchen light.</Markdown>
-        </ui>
-      </assistant>
-
-      ### CRITICAL: Finding Lights by Name to Delete
-      When the user asks to delete a light by name (e.g., "Delete the kitchen light" or "Remove the bedroom light"):
-      1. **ALWAYS call getLights first** - This returns an array of light objects, each with: { id: string, name: string, brightness: number }
-      2. **Find the matching light** - Search the array for a light where the name matches the user's request (case-insensitive, partial matches are acceptable)
-      3. **Extract the id** - Use the exact `id` string from the matching light object
-      4. **Call deleteLight** - Pass that exact `id` as the `lightId` parameter
-      5. **NEVER guess IDs** - You must always call getLights first to get the actual ID. Never use made-up IDs or try to construct them.
-      6. **If no match found** - Tell the user the light was not found rather than trying to delete with a guessed ID
-    `,
-    tools: [getLights, controlLight, deleteLight, toolJavaScript],
-    components: [
-      exposeComponent(LightChatComponent, {
-        name: 'LightChat',
-        description: 'A component that lets the user control a light',
-        props: {
-          lightId: s.string('The id of the light'),
-        },
-      }),
-      exposeComponent(MarkdownComponent, {
-        name: 'Markdown',
-        description: 'Show markdown content to the user',
-        children: 'text',
-      }),
-      exposeComponent(CardComponent, {
-        name: 'Card',
-        description: 'Show a card with children components to the user',
-        children: 'any',
-        props: {
-          title: s.string('The title of the card'),
-          description: s.streaming.string('The description of the card'),
-        },
-      }),
-    ],
-  });
-
-  // ... rest of component implementation
-};
-```
-
-**Note:** Notice that we do **not** expose a `DeleteLightButton` component. We only provide the `deleteLight` tool, which allows the AI to delete lights directly.
+You might wonder why we don't also expose a `DeleteLightButton` component. The reason is by only providing tools for actions, we make it clear to the AI that it should perform the action directly.
 
 ---
 
@@ -646,4 +490,167 @@ Result:
 
 This creates a smooth, visual experience where the user can see the AI's selection process in action, making it clear that the AI understood their request and acted on it.
 
+## Enabling the Add scene button
 
+After the above actions, we want the user prompt to be able to complete the task in the modal to confirm the new scene.
+
+The prompt would be something like this: *press the add scene button in the modal to confirm the new scene.*
+
+To enable the AI to click the "Add Scene" button, we need to create a **DOM interaction tool** that can find and click buttons by their text content.
+
+### Create the `clickButtonByText` Tool
+
+```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
+const clickButtonByText = useTool({
+  name: 'clickButtonByText',
+  description: 'Click a button by finding it by its text content. Use this to click buttons in modals, like "Add Scene", "Update Scene", "Cancel", etc. This tool will automatically close any open dropdowns before clicking.',
+  schema: s.object('Click button by text', {
+    buttonText: s.string('The text content of the button to click (e.g., "Add Scene", "Update Scene", "Cancel")'),
+  }),
+  handler: (input) => {
+    const { buttonText } = input;
+    
+    // Helper to check if select is open
+    const checkIfSelectOpen = () => {
+      const options = Array.from(
+        document.querySelectorAll('[role="option"], [data-radix-select-item]')
+      );
+      return options.length > 0;
+    };
+    
+    // Helper to close select
+    const closeSelect = () => {
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        }, i * 50);
+      }
+    };
+    
+    // First, ensure any open select dropdowns are closed
+    const wasOpen = checkIfSelectOpen();
+    if (wasOpen) {
+      closeSelect();
+    }
+    
+    // Wait for dropdowns to close, then find and click the button
+    return new Promise((resolve, reject) => {
+      const findAndClickButton = (attempt: number) => {
+        setTimeout(() => {
+          // Double-check select is closed
+          const stillOpen = checkIfSelectOpen();
+          if (stillOpen && attempt < 5) {
+            closeSelect();
+            findAndClickButton(attempt + 1);
+            return;
+          }
+          
+          // Find all buttons and filter out hidden ones or those in dropdowns
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const modalButtons = buttons.filter((btn) => {
+            if (btn.classList.contains('hidden') || 
+                btn.hasAttribute('hidden') ||
+                window.getComputedStyle(btn).display === 'none') {
+              return false;
+            }
+            const isInSelect = btn.closest('[role="listbox"]') || 
+                               btn.closest('[data-radix-select-content]');
+            return btn.offsetParent !== null && 
+                   btn.closest('[role="dialog"]') !== null &&
+                   !isInSelect;
+          });
+          
+          const button = modalButtons.find(
+            (btn) => btn.textContent?.trim() === buttonText.trim()
+          );
+
+          if (!button) {
+            reject(
+              new Error(`Button with text "${buttonText}" not found. Make sure the modal is open and the button exists.`),
+            );
+            return;
+          }
+          
+          // Ensure no select dropdowns are open before clicking
+          const finalCheck = checkIfSelectOpen();
+          if (finalCheck) {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+            setTimeout(() => {
+              button.click();
+              resolve({ success: true, buttonText });
+            }, 100);
+          } else {
+            button.click();
+            resolve({ success: true, buttonText });
+          }
+        }, wasOpen ? 200 : 50);
+      };
+
+      findAndClickButton(1);
+    });
+  },
+  deps: [],
+});
+```
+
+**Key Points:**
+- Closes any open select dropdowns before clicking (prevents conflicts)
+- Filters out hidden buttons and buttons inside select portals
+- Only targets visible buttons inside the dialog
+- Uses native `.click()` method for React compatibility
+
+### Add the Tool to the Chat Panel
+
+Add `clickButtonByText` to the `tools` array in `useUiChat`:
+
+```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
+const { messages, sendMessage, /* ... */ } = useUiChat({
+  model: 'gpt-4.1',
+  debugName: 'RichChatPanel',
+  system: prompt`...`,
+  tools: [
+    getLights, 
+    controlLight, 
+    deleteLight, 
+    clickButtonByText,  // Add this
+    toolJavaScript
+  ],
+  components: [/* ... */],
+});
+```
+
+### Update the System Prompt
+
+Add instructions for clicking the button:
+
+```typescript
+system: prompt`
+  // ... existing instructions ...
+
+  ### Completing the Add Scene Modal
+  When the user asks you to click the "Add Scene" button to confirm the scene:
+  - Use clickButtonByText with buttonText="Add Scene" (or "Update Scene" if editing)
+  - The tool will automatically close any open dropdowns before clicking
+  - Example:
+    <user>Press the add scene button in the modal to confirm the new scene</user>
+    <assistant>
+      <tool-call>clickButtonByText</tool-call>
+      <tool-args>{"buttonText": "Add Scene"}</tool-args>
+    </assistant>
+`,
+```
+
+This enables the AI to click the "Add Scene" button to submit the form and complete the scene creation workflow.
+
+## Conclusion
+
+Having an in-app chat bot that can control the apps UI and work with a user to perform tasks is a very powerful feature.
+
+Hashbrown is not the only option for this.  You may be able to think of some big companies that are already doing this, such as Windows Copilot.  There are also testing frameworks like Cypress or Playwritght that also allow a developer to create test scripts which control the UI and confirm app behavior.  I feel like there will be more options in this field, and I hope that Hashbrown will continue to evolve and be one of the open source options for this.
+
+Of course, Hashbrown is just at the beginning.
+Currently [@hashbrownai/core on npm](https://www.npmjs.com/package/@hashbrownai/core) is as version 0.4.1 which was published 20 days ago.
+
+The React app uses Hashbrown version 0.4.1-alpha.1 which means they are keeping the versions in line for now.
+
+Being an early adopter means that things can and will change, so don't expect this guide to work if that happens.  However, I will keep an eye on it and time permitting update or create a new guide when things do.
