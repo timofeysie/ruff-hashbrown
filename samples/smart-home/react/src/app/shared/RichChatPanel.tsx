@@ -656,14 +656,14 @@ export const RichChatPanel = () => {
           sceneName: s.anyOf([
             s.string('The name for the new scene'),
             s.nullish(),
-          ]),
+          ]) as any,
           lightIds: s.anyOf([
             s.array(
               'Array of light IDs to automatically add to the scene',
               s.string('The ID of a light to add'),
             ),
             s.nullish(),
-          ]),
+          ]) as any,
         },
       }),
     ],
