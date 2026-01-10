@@ -32,10 +32,18 @@ We would also like the AI to be able to respond to this kind of prompt:
   - [Step 2: Delay Adding Initial Lights](#step-2-delay-adding-initial-lights)
   - [Step 3: Animate the Selection](#step-3-animate-the-selection)
   - [Step 4: Prevent Duplicate Adds](#step-4-prevent-duplicate-adds)
+  - [How It Works](#how-it-works)
+  - [Key Points](#key-points)
+  - [Complete Flow Example](#complete-flow-example)
 - [Enabling the Add scene button](#enabling-the-add-scene-button)
+  - [Create the `setFormInputValue` Tool](#create-the-setforminputvalue-tool)
   - [Create the `clickButtonByText` Tool](#create-the-clickbuttonbytext-tool)
-  - [Add the Tool to the Chat Panel](#add-the-tool-to-the-chat-panel)
+  - [Add the Tools to the Chat Panel](#add-the-tools-to-the-chat-panel)
   - [Update the System Prompt](#update-the-system-prompt)
+- [Deleting a Scene](#deleting-a-scene)
+  - [Step 1: Create the Get Scenes and Delete Scene Tools](#step-1-create-the-get-scenes-and-delete-scene-tools)
+  - [Step 2: Add the Tools to the Chat Panel](#step-2-add-the-tools-to-the-chat-panel)
+  - [Step 3: Update the System Prompt](#step-3-update-the-system-prompt)
 - [Conclusion](#conclusion)
 
 ---
@@ -46,8 +54,8 @@ Before we begin, it's important to understand the difference:
 
 - **Components** (`exposeComponent()`) - UI elements that the AI can render. The AI cannot directly interact with them; users must click buttons or interact with the UI. Examples: displaying cards, markdown content, or interactive controls that require user input.
 - **Tools** (`useTool()`) - Functions that the AI can call directly to perform actions programmatically. The AI executes these functions automatically when appropriate. Examples: deleting items, updating data, querying information.
-- **Triggers** (`exposeComponent()` with `useEffect` & `useRef`) - Control component state to programmatically control UI. They combine the declarative nature of components with the automatic execution of tools.  The "auto-action" is a React pattern: `useEffect()` to run side effects on mount or when dependencies change and `useRef()` to access DOM elements.
 - **DOM Interaction Tools** (`useTool()` with DOM manipulation) - Tools that directly interact with the DOM to perform UI actions like clicking buttons, filling inputs, or selecting dropdown options. These are used when you need the AI to interact with existing UI elements that are already rendered (e.g., clicking a button in an open modal). Unlike triggers which use React patterns, DOM interaction tools use `document.querySelector()`, `getElementById()`, and native DOM methods.
+- **Triggers** (`exposeComponent()` with `useEffect` & `useRef`) - Control component state to programmatically control UI. They combine the declarative nature of components with the automatic execution of tools.  The "auto-action" is a React pattern: `useEffect()` to run side effects on mount or when dependencies change and `useRef()` to access DOM elements.
 - **Component schemas** — Hashbrown's way of describing component props to the AI.
 
 **For delete functionality, you should use a tool**, not a component. This allows the AI to delete items directly when asked (e.g., "Delete the kitchen light"), rather than just showing a button that the user must click.
@@ -500,7 +508,7 @@ To enable the AI to complete the modal workflow (filling in the scene name and c
 
 ### Create the `setFormInputValue` Tool
 
-This tool allows the AI to fill in form fields like the scene name:
+This tool allows the AI to fill in form fields like the scene name. It includes retry logic to wait for modals to render and uses proper event handling for React controlled components:
 
 ```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
 const setFormInputValue = useTool({
@@ -512,26 +520,59 @@ const setFormInputValue = useTool({
   }),
   handler: (input) => {
     const { inputId, value } = input;
-    const inputElement = document.getElementById(inputId) as HTMLInputElement;
-    
-    if (!inputElement) {
-      return Promise.reject(
-        new Error(`Input element with id "${inputId}" not found. Make sure the modal is open and the input exists.`),
-      );
-    }
+    // Wait for modal to render, then set the value
+    return new Promise((resolve, reject) => {
+      const trySetValue = (attempt: number) => {
+        setTimeout(() => {
+          const inputElement = document.getElementById(inputId) as HTMLInputElement;
+          if (!inputElement) {
+            if (attempt < 5) {
+              trySetValue(attempt + 1);
+              return;
+            }
+            reject(
+              new Error(`Input element with id "${inputId}" not found. Make sure the modal is open and the input exists.`),
+            );
+            return;
+          }
 
-    // Set the value and trigger input event
-    inputElement.value = value;
-    inputElement.dispatchEvent(new Event('input', { bubbles: true }));
-    inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+          // Use native value setter and dispatch proper events for React
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            'value'
+          )?.set;
+          
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(inputElement, value);
+          } else {
+            inputElement.value = value;
+          }
 
-    return Promise.resolve({ success: true, inputId, value });
+          // Dispatch InputEvent for React compatibility
+          inputElement.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: value,
+          }));
+          inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+          resolve({ success: true, inputId, value });
+        }, attempt * 100);
+      };
+
+      trySetValue(0);
+    });
   },
   deps: [],
 });
 ```
 
-### Create the `clickButtonByText` Tool
+The above code retries up to 5 times to wait for modals to fully render.
+
+It then uses the native value setter to work with the scene name input in SceneDialogForm which is known as a  React controlled component.
+
+Finally, it dispatches `InputEvent` and `change` events for proper React state updates
 
 ### Create the `clickButtonByText` Tool
 
@@ -665,10 +706,33 @@ system: prompt`
 
   ### Completing the Add Scene Modal
   When the user asks you to complete or confirm actions in the Add Scene modal:
-  - If the user wants to set a scene name, use setFormInputValue with inputId="sceneName" and the desired value
+  - **If the user asks to "enter" or "type" a scene name** (e.g., "enter the name 'New Scene'"), you MUST use setFormInputValue with inputId="sceneName" and the desired value. Do NOT use the sceneName prop on <AddScene> - that only pre-fills and doesn't actually fill the input field.
   - To confirm/submit the form, use clickButtonByText with buttonText="Add Scene" (or "Update Scene" if editing)
   - The clickButtonByText tool will automatically close any open dropdowns before clicking
   - Examples:
+    <user>Open the Add Scene modal, enter the name "New Scene", select "Office Light", and click Add Scene</user>
+    <assistant>
+      <ui>
+        <AddScene />
+      </ui>
+    </assistant>
+    <assistant>
+      <tool-call>setFormInputValue</tool-call>
+      <tool-args>{"inputId": "sceneName", "value": "New Scene"}</tool-args>
+    </assistant>
+    <assistant>
+      <tool-call>getLights</tool-call>
+    </assistant>
+    <assistant>
+      <tool-call>selectOptionByText</tool-call>
+      <tool-args>{"selectId": "addLight", "optionText": "Office Light"}</tool-args>
+    </assistant>
+    <assistant>
+      <tool-call>clickButtonByText</tool-call>
+      <tool-args>{"buttonText": "Add Scene"}</tool-args>
+    </assistant>
+  
+  More examples:
     <user>Enter "New Scene" as the scene name and click Add Scene</user>
     <assistant>
       <tool-call>setFormInputValue</tool-call>
@@ -688,6 +752,78 @@ system: prompt`
 ```
 
 This enables the AI to click the "Add Scene" button to submit the form and complete the scene creation workflow.
+
+## Deleting a Scene
+
+To enable the AI to delete scenes, we follow the same pattern as deleting lights. We need two tools: `getScenes` to retrieve all scenes, and `deleteScene` to delete a scene by its id.
+
+### Step 1: Create the Get Scenes and Delete Scene Tools
+
+```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
+const getScenes = useTool({
+  name: 'getScenes',
+  description: 'Get the current scenes. Returns an array of scene objects, each with an id (string), name (string), and lights (array). Use the id field when calling other tools like deleteScene.',
+  handler: () => Promise.resolve(useSmartHomeStore.getState().scenes),
+  deps: [],
+});
+
+const deleteScene = useTool({
+  name: 'deleteScene',
+  description: 'Delete a scene by its id. You must first call getScenes to find the scene by name, then use the id field from that scene object. The sceneId must be the exact id string from the scene object. Returns the deleted scene id if successful, or an error if the scene was not found.',
+  schema: s.object('Delete scene input', {
+    sceneId: s.string('The id of the scene to delete. This must be the exact id string from the scene object returned by getScenes.'),
+  }),
+  handler: (input) => {
+    const { sceneId } = input;
+    const store = useSmartHomeStore.getState();
+    const scene = store.scenes.find((s) => s.id === sceneId);
+
+    if (!scene) {
+      return Promise.reject(
+        new Error(
+          `Scene with id "${sceneId}" not found. Make sure to call getScenes first to get the correct scene id.`,
+        ),
+      );
+    }
+
+    store.deleteScene(sceneId);
+
+    return Promise.resolve({
+      success: true,
+      deletedSceneId: sceneId,
+      deletedSceneName: scene.name,
+    });
+  },
+  deps: [],
+});
+```
+
+### Step 2: Add the Tools to the Chat Panel
+
+Add both `getScenes` and `deleteScene` to the `tools` array:
+
+```typescript
+tools: [getLights, controlLight, deleteLight, getScenes, deleteScene, setFormInputValue, clickButtonByText, selectOptionByText, toolJavaScript],
+```
+
+### Step 3: Update the System Prompt
+
+Add instructions for deleting scenes by name:
+
+```typescript
+system: prompt`
+  // ... existing instructions ...
+
+  ### CRITICAL: Finding Scenes by Name to Delete
+  When the user asks to delete a scene by name (e.g., "Delete the Automation Scene" or "Remove the Evening scene"):
+  1. ALWAYS call getScenes first - This returns an array of scene objects, each with: id (string), name (string), and lights (array)
+  2. Find the matching scene - Search the array for a scene where the name matches the user's request (case-insensitive, partial matches are acceptable)
+  3. Extract the id - Use the exact id string from the matching scene object
+  4. Call deleteScene - Pass that exact id as the sceneId parameter
+  5. NEVER guess IDs - You must always call getScenes first to get the actual ID. Never use made-up IDs or try to construct them.
+  6. If no match found - Tell the user the scene was not found rather than trying to delete with a guessed ID
+`,
+```
 
 ## Conclusion
 

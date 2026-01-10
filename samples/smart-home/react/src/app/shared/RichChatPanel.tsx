@@ -26,6 +26,12 @@ export const RichChatPanel = () => {
     handler: () => Promise.resolve(useSmartHomeStore.getState().lights),
     deps: [],
   });
+  const getScenes = useTool({
+    name: 'getScenes',
+    description: 'Get the current scenes. Returns an array of scene objects, each with an id (string), name (string), and lights (array). Use the id field when calling other tools like deleteScene.',
+    handler: () => Promise.resolve(useSmartHomeStore.getState().scenes),
+    deps: [],
+  });
   const controlLight = useTool({
     name: 'controlLight',
     description: 'Control the light. Brightness is a number between 0 and 100.',
@@ -69,6 +75,35 @@ export const RichChatPanel = () => {
         success: true,
         deletedLightId: lightId,
         deletedLightName: light.name,
+      });
+    },
+    deps: [],
+  });
+  const deleteScene = useTool({
+    name: 'deleteScene',
+    description: 'Delete a scene by its id. You must first call getScenes to find the scene by name, then use the id field from that scene object. The sceneId must be the exact id string from the scene object. Returns the deleted scene id if successful, or an error if the scene was not found.',
+    schema: s.object('Delete scene input', {
+      sceneId: s.string('The id of the scene to delete. This must be the exact id string from the scene object returned by getScenes.'),
+    }),
+    handler: (input) => {
+      const { sceneId } = input;
+      const store = useSmartHomeStore.getState();
+      const scene = store.scenes.find((s) => s.id === sceneId);
+  
+      if (!scene) {
+        return Promise.reject(
+          new Error(
+            `Scene with id "${sceneId}" not found. Make sure to call getScenes first to get the correct scene id.`,
+          ),
+        );
+      }
+  
+      store.deleteScene(sceneId);
+  
+      return Promise.resolve({
+        success: true,
+        deletedSceneId: sceneId,
+        deletedSceneName: scene.name,
       });
     },
     deps: [],
@@ -472,6 +507,15 @@ export const RichChatPanel = () => {
       5. NEVER guess IDs - You must always call getLights first to get the actual ID. Never use made-up IDs or try to construct them.
       6. If no match found - Tell the user the light was not found rather than trying to delete with a guessed ID
 
+      ### CRITICAL: Finding Scenes by Name to Delete
+      When the user asks to delete a scene by name (e.g., "Delete the Automation Scene" or "Remove the Evening scene"):
+      1. ALWAYS call getScenes first - This returns an array of scene objects, each with: id (string), name (string), and lights (array)
+      2. Find the matching scene - Search the array for a scene where the name matches the user's request (case-insensitive, partial matches are acceptable)
+      3. Extract the id - Use the exact id string from the matching scene object
+      4. Call deleteScene - Pass that exact id as the sceneId parameter
+      5. NEVER guess IDs - You must always call getScenes first to get the actual ID. Never use made-up IDs or try to construct them.
+      6. If no match found - Tell the user the scene was not found rather than trying to delete with a guessed ID
+
       ### Opening the Add Scene Dialog
       When the user asks to add, create, or make a new scene (e.g., "Add a scene", "Create a new scene", "I want to make a scene"):
       - Use the <AddScene> component to open the Add Scene dialog
@@ -582,7 +626,7 @@ export const RichChatPanel = () => {
           <tool-args>{"buttonText": "Add Scene"}</tool-args>
         </assistant>
     `,
-    tools: [getLights, controlLight, deleteLight, setFormInputValue, clickButtonByText, selectOptionByText, toolJavaScript],
+    tools: [getLights, controlLight, deleteLight, getScenes, deleteScene, setFormInputValue, clickButtonByText, selectOptionByText, toolJavaScript],
     components: [
       exposeComponent(LightChatComponent, {
         name: 'LightChat',
