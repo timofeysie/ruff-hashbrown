@@ -496,7 +496,42 @@ After the above actions, we want the user prompt to be able to complete the task
 
 The prompt would be something like this: *press the add scene button in the modal to confirm the new scene.*
 
-To enable the AI to click the "Add Scene" button, we need to create a **DOM interaction tool** that can find and click buttons by their text content.
+To enable the AI to complete the modal workflow (filling in the scene name and clicking the button), we need to create **DOM interaction tools**. These tools allow the AI to programmatically interact with form elements and buttons within the modal.
+
+### Create the `setFormInputValue` Tool
+
+This tool allows the AI to fill in form fields like the scene name:
+
+```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
+const setFormInputValue = useTool({
+  name: 'setFormInputValue',
+  description: 'Set the value of an input field. Use this to fill in form fields like scene names, text inputs, etc. The inputId should be the id attribute of the input element.',
+  schema: s.object('Set input value', {
+    inputId: s.string('The id attribute of the input element (e.g., "sceneName")'),
+    value: s.string('The value to set in the input field'),
+  }),
+  handler: (input) => {
+    const { inputId, value } = input;
+    const inputElement = document.getElementById(inputId) as HTMLInputElement;
+    
+    if (!inputElement) {
+      return Promise.reject(
+        new Error(`Input element with id "${inputId}" not found. Make sure the modal is open and the input exists.`),
+      );
+    }
+
+    // Set the value and trigger input event
+    inputElement.value = value;
+    inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+    return Promise.resolve({ success: true, inputId, value });
+  },
+  deps: [],
+});
+```
+
+### Create the `clickButtonByText` Tool
 
 ### Create the `clickButtonByText` Tool
 
@@ -599,9 +634,9 @@ const clickButtonByText = useTool({
 - Only targets visible buttons inside the dialog
 - Uses native `.click()` method for React compatibility
 
-### Add the Tool to the Chat Panel
+### Add the Tools to the Chat Panel
 
-Add `clickButtonByText` to the `tools` array in `useUiChat`:
+Add both `setFormInputValue` and `clickButtonByText` to the `tools` array in `useUiChat`:
 
 ```typescript:samples/smart-home/react/src/app/shared/RichChatPanel.tsx
 const { messages, sendMessage, /* ... */ } = useUiChat({
@@ -612,7 +647,8 @@ const { messages, sendMessage, /* ... */ } = useUiChat({
     getLights, 
     controlLight, 
     deleteLight, 
-    clickButtonByText,  // Add this
+    setFormInputValue,   // Add this
+    clickButtonByText,   // Add this
     toolJavaScript
   ],
   components: [/* ... */],
@@ -621,17 +657,28 @@ const { messages, sendMessage, /* ... */ } = useUiChat({
 
 ### Update the System Prompt
 
-Add instructions for clicking the button:
+Add instructions for completing the modal workflow:
 
 ```typescript
 system: prompt`
   // ... existing instructions ...
 
   ### Completing the Add Scene Modal
-  When the user asks you to click the "Add Scene" button to confirm the scene:
-  - Use clickButtonByText with buttonText="Add Scene" (or "Update Scene" if editing)
-  - The tool will automatically close any open dropdowns before clicking
-  - Example:
+  When the user asks you to complete or confirm actions in the Add Scene modal:
+  - If the user wants to set a scene name, use setFormInputValue with inputId="sceneName" and the desired value
+  - To confirm/submit the form, use clickButtonByText with buttonText="Add Scene" (or "Update Scene" if editing)
+  - The clickButtonByText tool will automatically close any open dropdowns before clicking
+  - Examples:
+    <user>Enter "New Scene" as the scene name and click Add Scene</user>
+    <assistant>
+      <tool-call>setFormInputValue</tool-call>
+      <tool-args>{"inputId": "sceneName", "value": "New Scene"}</tool-args>
+    </assistant>
+    <assistant>
+      <tool-call>clickButtonByText</tool-call>
+      <tool-args>{"buttonText": "Add Scene"}</tool-args>
+    </assistant>
+
     <user>Press the add scene button in the modal to confirm the new scene</user>
     <assistant>
       <tool-call>clickButtonByText</tool-call>

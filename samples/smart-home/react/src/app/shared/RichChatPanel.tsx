@@ -107,20 +107,80 @@ export const RichChatPanel = () => {
     }),
     handler: (input) => {
       const { inputId, value } = input;
-      const inputElement = document.getElementById(inputId) as HTMLInputElement;
       
-      if (!inputElement) {
-        return Promise.reject(
-          new Error(`Input element with id "${inputId}" not found. Make sure the modal is open and the input exists.`),
-        );
-      }
+      // Wait a bit for the modal to be fully rendered, then try to find and set the input
+      return new Promise((resolve, reject) => {
+        const trySetValue = (attempt: number) => {
+          setTimeout(() => {
+            const inputElement = document.getElementById(inputId) as HTMLInputElement;
+            
+            if (!inputElement) {
+              if (attempt < 5) {
+                // Retry if element not found yet (modal might still be opening)
+                trySetValue(attempt + 1);
+                return;
+              }
+              reject(
+                new Error(`Input element with id "${inputId}" not found. Make sure the modal is open and the input exists.`),
+              );
+              return;
+            }
 
-      // Set the value and trigger input event
-      inputElement.value = value;
-      inputElement.dispatchEvent(new Event('input', { bubbles: true }));
-      inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+            // Focus the input first to ensure it's active
+            inputElement.focus();
 
-      return Promise.resolve({ success: true, inputId, value });
+            // Clear any existing value first
+            inputElement.value = '';
+
+            // Use the native value setter to bypass React's restrictions
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+              window.HTMLInputElement.prototype,
+              'value'
+            )?.set;
+            
+            if (nativeInputValueSetter) {
+              nativeInputValueSetter.call(inputElement, value);
+            } else {
+              inputElement.value = value;
+            }
+
+            // Create and dispatch an InputEvent (more compatible with React than Event)
+            // Use 'beforeinput' and 'input' events to simulate real typing
+            const beforeInputEvent = new InputEvent('beforeinput', {
+              bubbles: true,
+              cancelable: true,
+              inputType: 'insertText',
+              data: value,
+            });
+            inputElement.dispatchEvent(beforeInputEvent);
+
+            const inputEvent = new InputEvent('input', {
+              bubbles: true,
+              cancelable: true,
+              inputType: 'insertText',
+              data: value,
+            });
+            inputElement.dispatchEvent(inputEvent);
+
+            // Also dispatch a change event
+            const changeEvent = new Event('change', {
+              bubbles: true,
+              cancelable: true,
+            });
+            inputElement.dispatchEvent(changeEvent);
+
+            // Trigger a blur event to ensure React processes the change
+            inputElement.blur();
+            
+            // Re-focus to show the value was set
+            inputElement.focus();
+
+            resolve({ success: true, inputId, value });
+          }, attempt * 100); // 0ms, 100ms, 200ms, etc.
+        };
+
+        trySetValue(0);
+      });
     },
     deps: [],
   });
@@ -417,6 +477,7 @@ export const RichChatPanel = () => {
       - Use the <AddScene> component to open the Add Scene dialog
       - The dialog will allow the user to configure the scene name and select lights
       - You can optionally pre-fill the scene name and automatically add lights by passing props
+      - **IMPORTANT**: If the user asks you to "enter" or "type" a scene name (e.g., "enter the name 'New Scene'"), you must use the setFormInputValue tool AFTER opening the modal, not the sceneName prop. The sceneName prop only pre-fills, but setFormInputValue actually fills the input field.
       - Examples:
         <user>Add a new scene</user>
         <assistant>
@@ -433,6 +494,17 @@ export const RichChatPanel = () => {
           <ui>
             <AddScene sceneName="Evening" lightIds={["kitchen-light-id"]} />
           </ui>
+        </assistant>
+
+        <user>Open the Add Scene modal and enter the name "New Scene"</user>
+        <assistant>
+          <ui>
+            <AddScene />
+          </ui>
+        </assistant>
+        <assistant>
+          <tool-call>setFormInputValue</tool-call>
+          <tool-args>{"inputId": "sceneName", "value": "New Scene"}</tool-args>
         </assistant>
 
       ### Adding Lights to a Scene
@@ -456,12 +528,34 @@ export const RichChatPanel = () => {
       ### Completing the Add Scene Modal
       When the user asks you to complete or confirm actions in the Add Scene modal (e.g., "press the add scene button", "confirm the new scene", "click add scene"):
       1. First, make sure the modal is open (use <AddScene> component if needed)
-      2. If the user wants to set a scene name, use setFormInputValue with inputId="sceneName" and the desired value
+      2. **If the user asks to "enter" or "type" a scene name** (e.g., "enter the name 'New Scene'"), you MUST use setFormInputValue with inputId="sceneName" and the desired value. Do NOT use the sceneName prop on <AddScene> - that only pre-fills and doesn't actually fill the input field.
       3. If the user wants to select a light, use selectOptionByText with selectId="addLight" and optionText set to the light name (e.g., "Office Light", "Kitchen Light")
       4. **IMPORTANT**: After selecting an option, wait for the select dropdown to close before clicking the button. The selectOptionByText tool will handle this automatically.
       5. To confirm/submit the form, use clickButtonByText with buttonText="Add Scene" (or "Update Scene" if editing)
       6. **CRITICAL**: Only click the button ONCE. Do not interact with the select again after clicking the button. The clickButtonByText tool will automatically close any open dropdowns before clicking.
       7. Example:
+        <user>Open the Add Scene modal, enter the name "New Scene", select "Office Light", and click Add Scene</user>
+        <assistant>
+          <ui>
+            <AddScene />
+          </ui>
+        </assistant>
+        <assistant>
+          <tool-call>setFormInputValue</tool-call>
+          <tool-args>{"inputId": "sceneName", "value": "New Scene"}</tool-args>
+        </assistant>
+        <assistant>
+          <tool-call>getLights</tool-call>
+        </assistant>
+        <assistant>
+          <tool-call>selectOptionByText</tool-call>
+          <tool-args>{"selectId": "addLight", "optionText": "Office Light"}</tool-args>
+        </assistant>
+        <assistant>
+          <tool-call>clickButtonByText</tool-call>
+          <tool-args>{"buttonText": "Add Scene"}</tool-args>
+        </assistant>
+      8. More examples:
         <user>Press the add scene button in the modal to confirm the new scene</user>
         <assistant>
           <tool-call>clickButtonByText</tool-call>
