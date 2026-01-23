@@ -1,7 +1,11 @@
 # Example Features
 
 We want an in-app chat AI agent to be able to perform actions in the app.
-We could implement our own custom solution for this, but thankfully, some very experienced developers are creating a framework which will allow us to add this kind of functionality to an app.  This framework is called [Hashbrown](https://hashbrown.dev/).  It hasn't taken off yet, but I believe it will.  When I first had some time to try it out, it had about 300 stars on GitHub.  The repo a few weeks later now has over 500 stars indicating a  slowly growing awareness of it.
+We could implement our own custom solution for this, but thankfully, some very experienced developers are creating a framework which will allow us to add this kind of functionality to an app.  This framework is called [Hashbrown](https://hashbrown.dev/). This could be described as a "Generative User Interface", or in general terms an AI UI.
+
+Its not just AI building apps, it's UI that converses with the user.  In another sense, Hashbrown is a whole new kind of user interface framework.
+
+It hasn't taken off yet, but I believe it will.  When I first had some time to try it out, it had about 300 stars on GitHub.  The repo a few weeks later now has over 500 stars indicating a  slowly growing awareness of it.
 
 In this guide, I explore what it takes to add functionality to the demo React app
 
