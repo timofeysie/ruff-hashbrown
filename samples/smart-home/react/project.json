@@ -8,7 +8,7 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "echo 'Skipping build for client-react'"
+        "command": "npx vite build --config samples/smart-home/react/vite.config.ts"
       }
     }
   }

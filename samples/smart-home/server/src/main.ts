@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { existsSync } from 'fs';
 import { Chat } from '@hashbrownai/core';
 import { HashbrownOpenAI } from '@hashbrownai/openai';
 
@@ -66,7 +68,73 @@ app.post('/api/chat', async (req, res) => {
   const timestamp = new Date().toISOString();
   const completionParams = req.body as Chat.Api.CompletionCreateParams;
 
-  console.log(`[${timestamp}] Starting chat stream...`);
+  // Log operation type
+  console.log(
+    `[${timestamp}] Operation: ${completionParams.operation || 'generate'}`,
+  );
+
+  // Log message structure and roles
+  if (completionParams.messages && completionParams.messages.length > 0) {
+    console.log(
+      `[${timestamp}] Messages (${completionParams.messages.length} total):`,
+    );
+
+    completionParams.messages.forEach((msg, index) => {
+      const msgTimestamp = new Date().toISOString();
+      const role = msg.role.toUpperCase();
+
+      if (msg.role === 'user') {
+        const content =
+          typeof msg.content === 'string'
+            ? msg.content
+            : JSON.stringify(msg.content);
+        console.log(
+          `[${msgTimestamp}]   [${index + 1}] ${role}: ${content.substring(0, 200)}${content.length > 200 ? '...' : ''}`,
+        );
+      } else if (msg.role === 'assistant') {
+        const hasContent = !!msg.content;
+        const hasToolCalls = !!(msg.toolCalls && msg.toolCalls.length > 0);
+        const contentPreview = hasContent
+          ? (typeof msg.content === 'string'
+              ? msg.content
+              : JSON.stringify(msg.content)
+            ).substring(0, 200)
+          : '';
+
+        if (hasToolCalls && msg.toolCalls) {
+          const toolCalls = msg.toolCalls;
+          console.log(
+            `[${msgTimestamp}]   [${index + 1}] ${role} TURN (with ${toolCalls.length} tool call(s)):`,
+          );
+          toolCalls.forEach((toolCall, tcIndex) => {
+            console.log(
+              `[${msgTimestamp}]     Tool Call ${tcIndex + 1}: ${toolCall.function.name}(${toolCall.function.arguments.substring(0, 100)}${toolCall.function.arguments.length > 100 ? '...' : ''})`,
+            );
+          });
+        } else if (hasContent) {
+          console.log(
+            `[${msgTimestamp}]   [${index + 1}] ${role} COMPLETION: ${contentPreview}${contentPreview.length > 200 ? '...' : ''}`,
+          );
+        } else {
+          console.log(`[${msgTimestamp}]   [${index + 1}] ${role}: (empty)`);
+        }
+      } else if (msg.role === 'tool') {
+        const toolContent =
+          typeof msg.content === 'string'
+            ? msg.content
+            : JSON.stringify(msg.content);
+        console.log(
+          `[${msgTimestamp}]   [${index + 1}] ${role} (${msg.toolName || 'unknown'}): ${toolContent.substring(0, 200)}${toolContent.length > 200 ? '...' : ''}`,
+        );
+      } else {
+        console.log(
+          `[${msgTimestamp}]   [${index + 1}] ${role}: ${JSON.stringify(msg).substring(0, 200)}`,
+        );
+      }
+    });
+  }
+
+  console.log(`[${timestamp}] Starting chat stream (completion)...`);
 
   try {
     const response = HashbrownOpenAI.stream.text({
@@ -84,7 +152,7 @@ app.post('/api/chat', async (req, res) => {
 
     const endTimestamp = new Date().toISOString();
     console.log(
-      `[${endTimestamp}] Chat stream completed (${chunkCount} chunks)`,
+      `[${endTimestamp}] ✅ COMPLETION finished (${chunkCount} chunks streamed)`,
     );
     res.end();
   } catch (error) {
@@ -98,6 +166,16 @@ app.post('/api/chat', async (req, res) => {
     }
   }
 });
+
+// Serve the React SPA in production. The Dockerfile copies the Vite build
+// output into a `client-react` subdirectory next to this bundle.
+const staticPath = path.join(__dirname, 'client-react');
+if (existsSync(staticPath)) {
+  app.use(express.static(staticPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+}
 
 app.listen(port, host, () => {
   console.log(`[ ready ] http://${host}:${port}`);
