@@ -76,7 +76,7 @@ resolved from the monorepo root are listed here explicitly.
   "scripts": {
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build --config client/vite.config.ts",
-    "build:server": "esbuild server/src/main.ts --bundle --platform=node --format=cjs --outfile=dist/server/main.js --sourcemap=false",
+    "build:server": "esbuild server/src/main.ts --bundle --platform=node --format=cjs --outfile=dist/server/main.js",
     "dev:client": "vite --config client/vite.config.ts",
     "dev:server": "node --watch --env-file=.env dist/server/main.js",
     "dev": "npm run build:server && concurrently \"npm run dev:client\" \"npm run dev:server\"",
@@ -86,9 +86,9 @@ resolved from the monorepo root are listed here explicitly.
     "docker:run": "docker run -p 3000:3000 --env-file .env smart-home"
   },
   "dependencies": {
-    "@hashbrownai/core": "0.4.1-alpha.1",
-    "@hashbrownai/openai": "0.4.1-alpha.1",
-    "@hashbrownai/react": "0.4.1-alpha.1",
+    "@hashbrownai/core": "0.4.1",
+    "@hashbrownai/openai": "0.4.1",
+    "@hashbrownai/react": "0.4.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "react": "18.3.1",
@@ -141,9 +141,9 @@ resolved from the monorepo root are listed here explicitly.
 }
 ```
 
-> **Note on `@hashbrownai/*` versions:** the packages are at `0.4.1-alpha.1`
-> in this monorepo. Pin to the same version or update to the latest published
-> release on npm (`npm show @hashbrownai/core version`).
+> **Note on `@hashbrownai/*` versions:** the monorepo uses `0.4.1-alpha.1`
+> (unbuilt TypeScript source) internally. Always pin to the published release
+> `0.4.1` (or the latest stable) when using these packages from npm.
 
 ---
 
@@ -455,3 +455,39 @@ docker run --rm -p 3000:3000 --env-file .env smart-home-test
    rules (`enforce-module-boundaries`). The standalone repo needs a simpler
    config; a basic `eslint.config.mjs` with TypeScript and React rules is
    sufficient.
+
+## Migrating to clean directory structure
+
+Here are some notes when moving the files from their demo repository setup to a server/client only configuration.
+
+```
+# ── Create directory structure ───────────────────────────────────────────────
+mkdir -p /Users/timo/repos/timo/emoji-app/client
+mkdir -p /Users/timo/repos/timo/emoji-app/server/src
+mkdir -p /Users/timo/repos/timo/emoji-app/docs
+
+# ── Copy React client ────────────────────────────────────────────────────────
+SRC=/Users/timo/repos/temp/hashbrown/samples/smart-home/react
+DEST=/Users/timo/repos/timo/emoji-app/client
+
+cp -r $SRC/src              $DEST/src
+cp    $SRC/index.html       $DEST/index.html
+cp    $SRC/tailwind.config.js $DEST/tailwind.config.js
+cp    $SRC/postcss.config.js  $DEST/postcss.config.js
+
+# ── Copy Express server ──────────────────────────────────────────────────────
+cp /Users/timo/repos/temp/hashbrown/samples/smart-home/server/src/main.ts \
+   /Users/timo/repos/timo/emoji-app/server/src/main.ts
+
+# ── Copy docs ────────────────────────────────────────────────────────────────
+cp /Users/timo/repos/temp/hashbrown/docs/deployments.md \
+   /Users/timo/repos/timo/emoji-app/docs/deployments.md
+cp /Users/timo/repos/temp/hashbrown/docs/auth.md \
+   /Users/timo/repos/timo/emoji-app/docs/auth.md
+cp /Users/timo/repos/temp/hashbrown/docs/setup.md \
+   /Users/timo/repos/timo/emoji-app/docs/setup.md
+
+# ── Rename "Ruff Home" → "Emoji App" in the HTML title ──────────────────────
+sed -i '' 's/Ruff Home/Emoji App/g' \
+   /Users/timo/repos/timo/emoji-app/client/index.html
+```
